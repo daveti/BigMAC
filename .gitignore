@@ -15,7 +15,7 @@ __pycache__
 tools/aosp/
 tools/atsh_setup/
 tools/extract/
-tools/sefcontext-parser/
-tools/selinux/
-tools/setools/
-tools/facts/
+sefcontext-parser/
+selinux/
+setools/
+facts/
