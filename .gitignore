@@ -19,3 +19,4 @@ sefcontext-parser/
 selinux/
 setools/
 facts/
+venv/
