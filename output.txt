@@ -1,0 +1,184 @@
+BigMAC Android Policy Processor
+ by Grant Hernandez (https://hernan.de/z)
+
+INFO: Loading android security policy tegu-bd4a.240925.111-factory-eb8b0266 (aosp)
+DEBUG: Loaded 'filesystems.db' (<class 'list'>)
+DEBUG: Loaded 'policy_files.db' (<class 'dict'>)
+INFO: Image summary: google - google (BUILD_ID BD4A.240925.111, Android 15)
+INFO: Loaded 1343 file contexts
+DEBUG: Loaded /init.environ.rc
+DEBUG: Loaded /system/etc/init/UprobeStats.rc
+DEBUG: Loaded /system/etc/init/aconfigd.rc
+DEBUG: Loaded /system/etc/init/android.system.suspend-service.rc
+DEBUG: Loaded /system/etc/init/apexd.rc
+DEBUG: Loaded /system/etc/init/atrace.rc
+DEBUG: Loaded /system/etc/init/audioserver.rc
+DEBUG: Loaded /system/etc/init/blank_screen.rc
+DEBUG: Loaded /system/etc/init/bootanim.rc
+DEBUG: Loaded /system/etc/init/bootstat.rc
+DEBUG: Loaded /system/etc/init/cameraserver.rc
+DEBUG: Loaded /system/etc/init/cppreopts.rc
+DEBUG: Loaded /system/etc/init/credstore.rc
+DEBUG: Loaded /system/etc/init/dmesgd.rc
+DEBUG: Loaded /system/etc/init/drmserver.rc
+DEBUG: Loaded /system/etc/init/dumpstate.rc
+DEBUG: Loaded /system/etc/init/flags_health_check.rc
+DEBUG: Loaded /system/etc/init/gatekeeperd.rc
+DEBUG: Unabled to find AID mapping for group readtracefs
+DEBUG: Loaded /system/etc/init/gpuservice.rc
+DEBUG: Loaded /system/etc/init/gsid.rc
+DEBUG: Loaded /system/etc/init/heapprofd.rc
+DEBUG: Loaded /system/etc/init/idmap2d.rc
+DEBUG: Loaded /system/etc/init/incidentd.rc
+DEBUG: Loaded /system/etc/init/installd.rc
+DEBUG: Loaded /system/etc/init/kcmdlinectrl.rc
+DEBUG: Loaded /system/etc/init/keystore2.rc
+DEBUG: Loaded /system/etc/init/llkd.rc
+DEBUG: Loaded /system/etc/init/lmkd.rc
+DEBUG: Loaded /system/etc/init/logd.rc
+DEBUG: Loaded /system/etc/init/lpdumpd.rc
+DEBUG: Loaded /system/etc/init/mdnsd.rc
+DEBUG: Loaded /system/etc/init/mediaextractor.rc
+DEBUG: Loaded /system/etc/init/mediametrics.rc
+DEBUG: Loaded /system/etc/init/mediaserver.rc
+DEBUG: Loaded /system/etc/init/misctrl.rc
+DEBUG: Loaded /system/etc/init/mtectrl.rc
+DEBUG: Loaded /system/etc/init/netbpfload.rc
+DEBUG: Loaded /system/etc/init/netd.rc
+DEBUG: Loaded /system/etc/init/odsign.rc
+DEBUG: Loaded /system/etc/init/otapreopt.rc
+DEBUG: Unabled to find AID mapping for group readtracefs
+DEBUG: Loaded /system/etc/init/perfetto.rc
+DEBUG: Loaded /system/etc/init/prng_seeder.rc
+DEBUG: Loaded /system/etc/init/recovery-persist.rc
+DEBUG: Loaded /system/etc/init/recovery-refresh.rc
+DEBUG: Loaded /system/etc/init/rss_hwm_reset.rc
+DEBUG: Loaded /system/etc/init/servicemanager.rc
+DEBUG: Loaded /system/etc/init/simpleperf.rc
+DEBUG: Loaded /system/etc/init/snapuserd.rc
+DEBUG: Loaded /system/etc/init/storaged.rc
+DEBUG: Loaded /system/etc/init/surfaceflinger.rc
+DEBUG: Loaded /system/etc/init/tombstoned.rc
+DEBUG: Unabled to find AID mapping for group readtracefs
+DEBUG: Loaded /system/etc/init/traced_perf.rc
+DEBUG: Loaded /system/etc/init/uncrypt.rc
+DEBUG: Loaded /system/etc/init/update_engine.rc
+DEBUG: Loaded /system/etc/init/update_verifier.rc
+DEBUG: Loaded /system/etc/init/usbd.rc
+DEBUG: Loaded /system/etc/init/virtual_camera.hal.rc
+DEBUG: Loaded /system/etc/init/vold.rc
+DEBUG: Loaded /system/etc/init/wifi.rc
+DEBUG: Loaded /system/etc/init/wificond.rc
+DEBUG: Loaded /vendor/etc/init/Exynos_C2.rc
+DEBUG: Unabled to find AID mapping for group context_hub
+DEBUG: Loaded /vendor/etc/init/android.hardware.audio.service-aidl.aoc.rc
+DEBUG: Loaded /vendor/etc/init/android.hardware.authsecret-service.citadel.rc
+DEBUG: Loaded /vendor/etc/init/android.hardware.bluetooth-service.bcmbtlinux.rc
+DEBUG: Loaded /vendor/etc/init/android.hardware.boot-service.default-pixel.rc
+DEBUG: Loaded /vendor/etc/init/android.hardware.camera.provider@2.7-service-google-apex.rc
+DEBUG: Unabled to find AID mapping for group context_hub
+DEBUG: Loaded /vendor/etc/init/android.hardware.contexthub-service.generic.rc
+DEBUG: Loaded /vendor/etc/init/android.hardware.drm-service.clearkey.rc
+DEBUG: Loaded /vendor/etc/init/android.hardware.dumpstate-service.rc
+DEBUG: Loaded /vendor/etc/init/android.hardware.edgetpu.logging@service-edgetpu-logging.rc
+DEBUG: Loaded /vendor/etc/init/android.hardware.gatekeeper-service.trusty.rc
+DEBUG: Loaded /vendor/etc/init/android.hardware.graphics.allocator2-aidl-service.rc
+DEBUG: Loaded /vendor/etc/init/android.hardware.gxp.logging@service-gxp-logging.rc
+DEBUG: Loaded /vendor/etc/init/android.hardware.health-service.zumapro.rc
+DEBUG: Loaded /vendor/etc/init/android.hardware.input.processor-service.rc
+DEBUG: Loaded /vendor/etc/init/android.hardware.neuralnetworks@service-darwinn-aidl.rc
+DEBUG: Loaded /vendor/etc/init/android.hardware.oemlock-service.citadel.rc
+DEBUG: Loaded /vendor/etc/init/android.hardware.power-service.pixel-libperfmgr.rc
+DEBUG: Loaded /vendor/etc/init/android.hardware.power.stats-service.pixel.rc
+DEBUG: Loaded /vendor/etc/init/android.hardware.secure_element-service.uicc.rc
+DEBUG: Loaded /vendor/etc/init/android.hardware.secure_element_gto.rc
+DEBUG: Loaded /vendor/etc/init/android.hardware.security.keymint-service.citadel.rc
+DEBUG: Loaded /vendor/etc/init/android.hardware.security.keymint-service.rust.trusty.rc
+DEBUG: Unabled to find AID mapping for group context_hub
+DEBUG: Loaded /vendor/etc/init/android.hardware.sensors-service-multihal.rc
+DEBUG: Loaded /vendor/etc/init/android.hardware.thermal-service.pixel.rc
+DEBUG: Loaded /vendor/etc/init/android.hardware.usb-service-i2c6.rc
+DEBUG: Loaded /vendor/etc/init/android.hardware.usb.gadget-service.rc
+DEBUG: Unabled to find AID mapping for group context_hub
+DEBUG: Loaded /vendor/etc/init/android.hardware.vibrator-service.cs40l26.rc
+DEBUG: Loaded /vendor/etc/init/android.hardware.weaver-service.citadel.rc
+DEBUG: Loaded /vendor/etc/init/android.hardware.wifi.supplicant-service.rc
+DEBUG: Loaded /vendor/etc/init/aocd.rc
+DEBUG: Loaded /vendor/etc/init/aocxd.rc
+DEBUG: Loaded /vendor/etc/init/atrace_categories.rc
+DEBUG: Loaded /vendor/etc/init/bipchmgr.rc
+DEBUG: Loaded /vendor/etc/init/boringssl_self_test.rc
+DEBUG: Loaded /vendor/etc/boringssl_self_test.zygote64.rc
+DEBUG: Loaded /vendor/etc/init/cbd.rc
+DEBUG: Loaded /vendor/etc/init/citadeld.rc
+DEBUG: Loaded /vendor/etc/init/com.google.edgetpu.dba-service.rc
+DEBUG: Loaded /vendor/etc/init/com.google.edgetpu.tachyon-service.rc
+DEBUG: Loaded /vendor/etc/init/dmd.rc
+DEBUG: Loaded /vendor/etc/init/dump_power.rc
+DEBUG: Loaded /vendor/etc/init/fingerprint-goodix.rc
+DEBUG: Loaded /vendor/etc/init/google.hardware.media.c2@2.0-service.rc
+DEBUG: Loaded /vendor/etc/init/gpu_probe.rc
+DEBUG: Loaded /vendor/etc/init/health-storage-default.rc
+DEBUG: Loaded /vendor/etc/init/hostapd.android.rc
+DEBUG: Loaded /vendor/etc/init/hwc3-pixel.rc
+DEBUG: Loaded /vendor/etc/init/init.aoc.rc
+DEBUG: Loaded /vendor/etc/init/init.camera.set-interrupts-ownership.rc
+DEBUG: Loaded /vendor/etc/init/init.display_logbuffer.rc
+DEBUG: Loaded /vendor/etc/init/init.esim-gs.rc
+DEBUG: Loaded /vendor/etc/init/init.fingerprint.dump.rc
+DEBUG: Loaded /vendor/etc/init/init.gnss.rc
+DEBUG: Loaded /vendor/etc/init/init.liboemservice_proxy.rc
+DEBUG: Loaded /vendor/etc/init/init.modem_logging_control.rc
+DEBUG: Loaded /vendor/etc/init/init.module.rc
+DEBUG: Loaded /vendor/etc/init/init.pixel-mm-gs.rc
+DEBUG: Loaded /vendor/etc/init/init.pixel.rc
+DEBUG: Loaded /vendor/etc/init/init.power-gs.rc
+DEBUG: Loaded /vendor/etc/init/init.shared_modem_platform.rc
+DEBUG: Loaded /vendor/etc/init/init.sscoredump.rc
+DEBUG: Loaded /vendor/etc/init/init.storage.rc
+DEBUG: Loaded /vendor/etc/init/init.touch.gti0.rc
+DEBUG: Loaded /vendor/etc/init/init.touch.predump.rc
+DEBUG: Loaded /vendor/etc/init/init.touch.syna.rc
+DEBUG: Loaded /vendor/etc/init/init.usf.rc
+DEBUG: Loaded /vendor/etc/init/init.vendor_telephony.rc
+DEBUG: Loaded /vendor/etc/init/init_dauntless.rc
+DEBUG: Loaded /vendor/etc/init/libg3a_gabc.rc
+DEBUG: Loaded /vendor/etc/init/libg3a_gaf.rc
+DEBUG: Loaded /vendor/etc/init/libg3a_ghawb.rc
+DEBUG: Loaded /vendor/etc/init/memtrack.rc
+DEBUG: Loaded /vendor/etc/init/nfc-service-default.rc
+DEBUG: Loaded /vendor/etc/init/pixel-gnss-default.rc
+DEBUG: Loaded /vendor/etc/init/pixel-mm-gki.rc
+DEBUG: Loaded /vendor/etc/init/pixel-thermal-symlinks.rc
+DEBUG: Unabled to find AID mapping for group context_hub
+DEBUG: Loaded /vendor/etc/init/pixelstats-vendor.zumapro.rc
+DEBUG: Loaded /vendor/etc/init/pktrouter.rc
+DEBUG: Loaded /vendor/etc/init/rebalance_interrupts-vendor.gs101.rc
+DEBUG: Loaded /vendor/etc/init/rfsd.rc
+DEBUG: Loaded /vendor/etc/init/rild_exynos.rc
+DEBUG: Loaded /vendor/etc/init/samsung.hardware.media.c2@1.2-service.rc
+DEBUG: Loaded /vendor/etc/init/trusty_metricsd.rc
+DEBUG: Loaded /vendor/etc/init/twoshay.rc
+DEBUG: Loaded /vendor/etc/init/vendor.google.battery_mitigation-default.rc
+DEBUG: Loaded /vendor/etc/init/vendor.google.edgetpu_vendor_service@1.0-service.rc
+DEBUG: Loaded /vendor/etc/init/vendor.google.google_battery-default.rc
+DEBUG: Loaded /vendor/etc/init/vendor.google.modem_ml_svc_sit.rc
+DEBUG: Loaded /vendor/etc/init/vendor.google.radioext@1.0-service.rc
+DEBUG: Loaded /vendor/etc/init/vendor.google.wireless_charger-default.rc
+DEBUG: Loaded /vendor/etc/init/vendor.google.wireless_charger.service-default.rc
+DEBUG: Loaded /vendor/etc/init/vndservicemanager.rc
+DEBUG: Boot early-init
+INFO: Associating mount point /proc [fstype=proc, dev=proc, opt=[['rw', 'relatime', 'gid=3009', 'hidepid=2']]]
+INFO: Associating mount point /sys [fstype=sysfs, dev=sysfs, opt=['rw', 'seclabel', 'relatime']]
+DEBUG: Boot init
+DEBUG: Boot late-init
+INFO: Enabling service vendor.citadeld
+INFO: Opening SELinux policy "policy/aosp/tegu-bd4a.240925.111-factory-eb8b0266/precompiled_sepolicy"
+DEBUG: Generating attributes for policy. (Step 4 of 5)
+DEBUG: Building conditional rules tables. (Step 5 of 5)
+INFO: Successfully opened SELinux policy "policy/aosp/tegu-bd4a.240925.111-factory-eb8b0266/precompiled_sepolicy"
+INFO: Building SEPolicy graph
+INFO: Created SEPolicy graph with 2661 nodes and 52080 edges
+INFO: Overlaying policy to filesystems
+INFO: Applying file contexts to VFS...
+WARNING: Context mismatch between xattr (u:object_r:rootfs:s0) and file_context (u:object_r:proc:s0) for /proc. Preferring latter

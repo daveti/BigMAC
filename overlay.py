@@ -372,6 +372,7 @@ class SEPolicyInst(object):
                 obj.trusted = True
                 log.debug("Object %s is trusted (reason: %s)", name, reason)
 
+
     def get_object_node(self, edge):
         teclass = edge["teclass"]
         cls = self.sepolicy["classes"][teclass]
@@ -388,12 +389,13 @@ class SEPolicyInst(object):
             elif base_object_type in ["cap", "cap2"]:
                 node = SubjectNode(Cred())
         else:
+            # Added new nodes including keystore2_key, keystore2, lockdown, perf_event, and io_uring for compatbilitiy with AOSP 15.0
             if teclass in ['drmservice', 'debuggerd', 'property_service', 'service_manager', 'hwservice_manager',
-                    'binder', 'key', 'msg', 'system', 'security', 'keystore_key', 'zygote']:
+                    'binder', 'key', 'msg', 'system', 'security', 'keystore_key', 'zygote', 'keystore2']:
                 node = IPCNode(teclass)
             elif teclass in ['netif', 'peer', 'node']:
                 node = IPCNode("socket")
-            elif teclass in ['filesystem']:
+            elif teclass in ['filesystem', 'keystore2_key', "perf_event", "io_uring"]:
                 node = FileNode()
             elif teclass in ["cap_userns", "cap2_userns", "capability", "capability2", "fd"]:
                 node = SubjectNode(Cred())
@@ -402,6 +404,9 @@ class SEPolicyInst(object):
             # TODO: properly handle BPF
             elif teclass in ["bpf"]:
                 node = SubjectNode(Cred())
+            elif teclass in ["lockdown"]:
+                node = SubjectNode(Cred())
+                #return None
 
         if node is None:
             raise ValueError("Unhandled object type %s" % teclass)
@@ -773,15 +778,42 @@ class SEPolicyInst(object):
                 (fn, _), = init_child.exe.items()
                 cmd = self.filesystem.realpath(service.service_args[0])
 
-                if cmd == fn and not service.oneshot:
+                if os.path.basename(cmd) == os.path.basename(fn) and not service.oneshot:
                     if found_service:
                         continue
 
                     found_service = service
 
             if not found_service:
-                log.warn("Could not find a service definition for process %s", init_child)
-                continue
+                # Special case: zygote is not started by a service, but directly by init
+                if "zygote" in init_child.subject.sid.type:
+                    log.info("Special case: setting zygote process as RUNNING without service definition")
+                    init_child.state = ProcessState.RUNNING
+                    
+                    # Set default args for zygote if not present
+                    (fn, _), = init_child.exe.items()
+                    default_args = [fn]
+                    if "64" in fn:
+                        default_args.extend(["--start-system-server"])
+                    
+                    # Create a mock service object with the args
+                    class MockService:
+                        def __init__(self):
+                            self.service_args = default_args
+                    service = MockService()
+                    
+                    # Zygote special case handling
+                    if "--start-system-server" in default_args:
+                        if system_server_parent is not None:
+                            log.error("Found multiple system_server parents!")
+                            continue
+                        system_server_parent = init_child
+                        log.info("Primary system_server parent (from special case): %s", init_child)
+                    
+                    continue
+                else:
+                    log.warn("Could not find a service definition for process %s", init_child)
+                    continue
 
             # TODO: handle disabled services
             init_child.state = ProcessState.RUNNING
@@ -1743,6 +1775,8 @@ Groups:\t%s
                             #continue
                         # TODO:
                         elif edge["teclass"] == "bpf":
+                            continue
+                        elif edge["teclass"] == "lockdown":
                             continue
                         # handled later
                         elif edge["teclass"] in ["capability", "capability2"]:

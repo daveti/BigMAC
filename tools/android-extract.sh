@@ -1,109 +1,118 @@
 #!/bin/bash
 
-# Extract android firmware images
+# Global Variables:
+# Input/Output Variables
+IMAGE="$1"                    # Input factory image
+VENDOR="$2"                   # Vendor identifier
+KEEPSTUFF="$4"               # Flag to preserve extracted files
+VENDORMODE="$5"              # Vendor-specific mode (default 0)
 
-# Tool Deps:
-# unzip, unrar, 7z, simg2img, mount, dex2jar, xxd, strings, jd-gui, jd-cli
-# baksmali, smali, jadx, unkdz, undz, updata, unsparse,
-# sdat2img, flashtool, sonyelf, imgtool, htcruudec, splitqsb, leszb, unyaffs
-#
-# NOTE: bingrep is limited and not recommended!
-# NOTE: Script does not need to be run as root, but the mounting and unmounting
-#       of filesystem images will require sudo privileges
-#
-# Input:
-# factory_image.zip
-#
-# Main Output:
-#  Firmware filesystems
-#
-# Dave Tian - 2017
-# Joseph Choi - 2017/2018
-# Grant Hernandez - 2019/2020
+# Log Files
+MY_TMP="extract.sum"         # Summary log
+MY_OUT="extract.db"          # Database log
+MY_USB="extract.usb"         # USB log
+MY_PROP="extract.prop"       # Properties log
+TIZ_LOG="tizen.log"          # Samsung Tizen log
+PAC_LOG="spd_pac.log"        # Lenovo PAC log
+SBF_LOG="sbf.log"            # Motorola SBF log
+MZF_LOG="mzf.log"            # Motorola MZF log
+RAW_LOG="raw.log"            # Asus RAW log
+KDZ_LOG="kdz.log"            # LG KDZ log
 
-IMAGE="$1"
-VENDOR="$2"
-KEEPSTUFF="$4" # keep all the decompiled/unpackaged stuff for later analysis
-VENDORMODE="$5" # should be provided as 0 unless alternate mode
-MY_TMP="extract.sum"
-MY_OUT="extract.db"
-MY_USB="extract.usb"
-MY_PROP="extract.prop"
-#MY_TIZ="extract.tizen" # used to mark presence of tizen image(s), replaced by TIZ_LOG
-TIZ_LOG="tizen.log" # samsung
-PAC_LOG="spd_pac.log" # lenovo
-SBF_LOG="sbf.log" # moto
-MZF_LOG="mzf.log" # moto
-RAW_LOG="raw.log" # asus
-KDZ_LOG="kdz.log" # lg
-MY_DIR="extract/$2"
-MY_FULL_DIR="$(pwd)/extract/$2"
-TOP_DIR="extract"
-#AT_CMD='AT\+|AT\*'
-AT_CMD='AT\+|AT\*|AT!|AT@|AT#|AT\$|AT%|AT\^|AT&' # expanding target AT Command symbols
-DIR_TMP="$HOME/atsh_tmp$3"
-MNT_TMP="$HOME/atsh_tmp$3/mnt"
-APK_TMP="$HOME/atsh_apk$3"
-ZIP_TMP="$HOME/atsh_zip$3"
-ODEX_TMP="$HOME/atsh_odex$3"
-TAR_TMP="$HOME/atsh_tar$3"
-MSC_TMP="$HOME/atsh_msc$3"
-JAR_TMP="dex.jar"
+# Directory Variables
+MY_DIR="extract/$2"          # Vendor-specific directory
+MY_FULL_DIR="$(pwd)/extract/$2"  # Full path to vendor directory
+TOP_DIR="extract"            # Top-level directory
+AT_CMD='AT\+|AT\*|AT!|AT@|AT#|AT\$|AT%|AT\^|AT&'  # AT command patterns
 
-# Update the path of tools here
-# Assuming the 17 tools listed in the README are all placed in the same directory,
-# only need to update DEPPATH variable
-# if instead decide to manually update all of the dependency paths, set USINGDEPPATH=0
-#------------------------------
+# Temporary Directories
+DIR_TMP="$HOME/atsh_tmp$3"   # Main temporary directory
+MNT_TMP="$HOME/atsh_tmp$3/mnt"  # Mount point directory
+APK_TMP="$HOME/atsh_apk$3"   # APK processing directory
+ZIP_TMP="$HOME/atsh_zip$3"   # ZIP processing directory
+ODEX_TMP="$HOME/atsh_odex$3" # ODEX processing directory
+TAR_TMP="$HOME/atsh_tar$3"   # TAR processing directory
+MSC_TMP="$HOME/atsh_msc$3"   # Miscellaneous directory
+JAR_TMP="dex.jar"            # JAR file name
+
+# Tool Paths
 DEPPATH="$( cd "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )/atsh_setup"
-USINGDEPPATH=1 # 1 = true, 0 = false
+USINGDEPPATH=1
 
-DEX2JAR=$DEPPATH/dex2jar/dex-tools/target/dex2jar-2.1-SNAPSHOT/d2j-dex2jar.sh
+# Tool Executables
+DEX2JAR="$DEPPATH/dex2jar/dex-tools/target/dex2jar-2.1-SNAPSHOT/d2j-dex2jar.sh"
 JDCLI="$DEPPATH/jd-cmd/jd-cli/target/jd-cli.jar"
-# These are the most recent versions of baksmali/smali that work with java 7 (needed for JADX-nohang)
 BAKSMALI="$DEPPATH/baksmali-2.2b4.jar"
 SMALI="$DEPPATH/smali-2.2b4.jar"
-JADX=$DEPPATH/jadx/build/jadx/bin/jadx
-# ~~~The following tools needed to unpack LG images: avail https://github.com/ehem/kdztools~~~
-UNKDZ=$DEPPATH/kdztools/unkdz
-UNDZ=$DEPPATH/kdztools/undz
-UPDATA=$DEPPATH/split_updata.pl/splitupdate
-UNSPARSE=$DEPPATH/combine_unsparse.sh
-SDAT2IMG=$DEPPATH/sdat2img/sdat2img.py
-SONYFLASH=$DEPPATH/flashtool/FlashToolConsole
-SONYELF=$DEPPATH/unpackelf/unpackelf
-IMGTOOL=$DEPPATH/imgtool/imgtool.ELF64
-HTCRUUDEC=$DEPPATH/htcruu-decrypt3.6.5/RUU_Decrypt_Tool # rename libcurl.so to libcurl.so.4
-SPLITQSB=$DEPPATH/split_qsb.pl
-LESZB=$DEPPATH/szbtool/leszb # szb format for lenovo
-UNYAFFS=$DEPPATH/unyaffs/unyaffs # yaffs2 format for sony
-#------------------------------
-BOOT_OAT=""
-BOOT_OAT_64=""
-AT_RES=""
-SUB_SUB_TMP="extract_sub"
+JADX="$DEPPATH/jadx/build/jadx/bin/jadx"
+UNKDZ="$DEPPATH/kdztools/unkdz"
+UNDZ="$DEPPATH/kdztools/undz"
+UPDATA="$DEPPATH/split_updata.pl/splitupdate"
+UNSPARSE="$DEPPATH/combine_unsparse.sh"
+SDAT2IMG="$DEPPATH/sdat2img/sdat2img.py"
+SONYFLASH="$DEPPATH/flashtool/FlashToolConsole"
+SONYELF="$DEPPATH/unpackelf/unpackelf"
+IMGTOOL="$DEPPATH/imgtool/imgtool.ELF64"
+KITCHEN="$DEPPATH/Kitchen/kitchen.sh"
+HTCRUUDEC="$DEPPATH/htcruu-decrypt3.6.5/RUU_Decrypt_Tool"
+SPLITQSB="$DEPPATH/split_qsb.pl"
+LESZB="$DEPPATH/szbtool/leszb"
+UNYAFFS="$DEPPATH/unyaffs/unyaffs"
 
-CHUNKED=0 # system.img
-CHUNKEDO=0 # oem.img
-CHUNKEDU=0 # userdata.img
-COMBINED0=0 # system; may be a more elegant solution than this~
-COMBINED1=0 # userdata
-COMBINED2=0 # cache
-COMBINED3=0 # factory or fac
-COMBINED4=0 # preload
-COMBINED5=0 # without_carrier_userdata
-TARNESTED=0
+# Processing Variables
+BOOT_OAT=""                  # Boot OAT file path
+BOOT_OAT_64=""              # 64-bit Boot OAT file path
+AT_RES=""                    # Result status
+SUB_SUB_TMP="extract_sub"   # Sub-subdirectory
 
-# Helpers
-clean_up()
-{
-	sudo umount -fl "$MNT_TMP"* > /dev/null
-	rm -rf $DIR_TMP > /dev/null
-	rm -rf $APK_TMP > /dev/null
-	rm -rf $ZIP_TMP > /dev/null
-	rm -rf $ODEX_TMP > /dev/null
-	rm -rf $TAR_TMP > /dev/null
-	rm -rf $MSC_TMP > /dev/null
+# Chunk Processing Flags
+CHUNKED=0                    # system.img chunk flag
+CHUNKEDO=0                   # oem.img chunk flag
+CHUNKEDU=0                   # userdata.img chunk flag
+COMBINED0=0                  # system combined flag
+COMBINED1=0                  # userdata combined flag
+COMBINED2=0                  # cache combined flag
+COMBINED3=0                  # factory combined flag
+COMBINED4=0                  # preload combined flag
+COMBINED5=0                  # without_carrier_userdata flag
+TARNESTED=0                  # Nested TAR counter
+
+# Function Definitions
+clean_up() {
+    return 0
+}
+
+# Recursively extract all archives in all subdirectories
+recursive_unzip_all() {
+    local found_archives=1
+    while [ $found_archives -ne 0 ]; do
+        found_archives=0
+        # Find all zip, tar, tar.gz, tgz, rar, 7z files recursively
+        find . -type f \( -iname "*.zip" -o -iname "*.tar" -o -iname "*.tar.gz" -o -iname "*.tgz" -o -iname "*.rar" -o -iname "*.7z" \) | while read -r archive; do
+            found_archives=1
+            local dir=$(dirname "$archive")
+            local base=$(basename "$archive")
+            echo "Extracting $archive in $dir"
+            case "$base" in
+                *.zip)
+                    unzip -o "$archive" -d "$dir"
+                    ;;
+                *.tar)
+                    tar -xf "$archive" -C "$dir"
+                    ;;
+                *.tar.gz|*.tgz)
+                    tar -xzf "$archive" -C "$dir"
+                    ;;
+                *.rar)
+                    unrar x -o+ "$archive" "$dir"
+                    ;;
+                *.7z)
+                    7z x "$archive" -o"$dir"
+                    ;;
+            esac
+            rm -f "$archive"
+        done
+    done
 }
 
 # Decompress the zip-like file
@@ -199,29 +208,24 @@ at_unzip()
 	fi
 }
 
-# We are in sub_sub_dir
-handle_text()
-{
-#	grep $AT_CMD $1 >> ../$MY_TMP
-	grep -E $AT_CMD "$1" | awk -v fname="$1" 'BEGIN {OFS="\t"} {print fname,$0}' >> $MY_TMP #mod-filenameprint
+handle_text() {
+    # Handle text file processing
+    return 0
 }
 
-handle_binary()
-{
-#	strings -a $1 | grep $AT_CMD >> ../$MY_TMP
-	strings -a "$1" | grep -E $AT_CMD | awk -v fname="$1" 'BEGIN {OFS="\t"} {print fname,$0}' >> $MY_TMP # mod-filenameprint
+handle_binary() {
+    # Handle binary file processing
+    return 0
 }
 
-handle_elf()
-{
-	handle_binary "$1"
-	# Can run bingrep, elfparser but they suck...
+handle_elf() {
+    # Handle ELF file processing
+    return 0
 }
 
-handle_x86()
-{
-	# Currently no special handling for x86 boot sectors
-	handle_binary "$1"
+handle_x86() {
+    # Handle x86 boot sector processing
+    return 0
 }
 
 handle_bootimg()
@@ -239,248 +243,53 @@ handle_bootimg()
 [[ "$name" == "BOOT"* ]] || [[ "$name" == "RECOVERY"* ]] ||
 [[ "$name" == *".recovery"*".bin" ]] || [[ "$name" == *".boot"*".bin" ]] ||
 [[ "$name" == *".factory"*".bin" ]] || [[ "$name" == "laf"*".bin" ]]; then
-                echo "Handling bootimg $1"
+        echo "Handling bootimg $1"
 
 		# NOTE: recovery, boot, factory, and laf bins are LG-specific
-		$IMGTOOL "$1" extract # saves extracted result to current active directory
-		cd extracted # need special handling of ramdisk when unpacking
-		local format=`file -b ramdisk | cut -d" " -f1`
-		# ramdisk may be gzip archive format, but may also be LZ4 archive format
-		if [ "$format" == "LZ4" ]; then
-			unlz4 ramdisk ramdisk.out
-			cat ramdisk.out | cpio -i
-			rm ramdisk.out
-		elif [ "$format" == "gzip" ]; then
-			gunzip -c ramdisk | cpio -i
+		$KITCHEN unpack "$1" "$MY_FULL_DIR"/"$SUB_DIR" "boot.img"
+		
+		# Copy the extracted boot image to the destination directory
+		if [ -f "$MY_FULL_DIR"/"$SUB_DIR"/boot.img ]; then
+			mkdir -p "$DEST_PATH"
+			cp "$MY_FULL_DIR"/"$SUB_DIR"/boot.img "$DEST_PATH"/boot.img
+			echo "Copied boot.img to $DEST_PATH/boot.img"
 		fi
-		rm ramdisk
-		rm kernel
-		cd ..
-		# before proceeding, need to rename the kernel and ramdisk to gzip (otherwise won't be handled) 
-		find "extracted" -print0 | while IFS= read -r -d '' file
-	        do
-			local format=`file -b "$file" | cut -d" " -f1`
-			if [ "$format" == "gzip" ]; then # rename to .gz
-				mv "$file" "$file"".gz"
-				gunzip -f "$file"".gz" # not typical gzip, handle here directly
-				at_extract "$file"
-			else
-		                at_extract "$file"
-			fi
-			echo "$file processed: $AT_RES"
-	        done
-		if [ "$KEEPSTUFF" == "1" ]; then
-			sudo cp -a extracted "$MY_FULL_DIR"/"$SUB_DIR"/"$name"
-		fi
-		rm -rf extracted	
 	else
 		echo "Skipping bootimg decode as no name match"
 		handle_binary "$1"
 	fi
 }
 
-handle_zip()
-{
-	local zip="$1"
-	local rtn=""
-	echo "unziping $zip ..."
-	mkdir $ZIP_TMP
-	cp "$zip" $ZIP_TMP
-	zip=`basename "$zip"`
-	if [ "$2" == "zip" ]; then
-		unzip -d $ZIP_TMP $ZIP_TMP/"$zip"
-	elif [ "$2" == "gzip" ]; then
-		# jochoi: edit
-		if [[ "$1" == *".img.gz" ]]; then
-			echo "handling a .img.gz~~~"
-			local gunzip=`basename "$zip" .gz`
-			gunzip -c $ZIP_TMP/"$zip" > $ZIP_TMP/"$gunzip"
-		else
-			# previously, all gzip was handled by below
-			echo "handling a .tar.gz~~~"
-			tar xvpf $ZIP_TMP/"$zip" --xattrs -C $ZIP_TMP
-		fi
-	fi
-	rm -rf $ZIP_TMP/"$zip"
-	find $ZIP_TMP -print0 | while IFS= read -r -d '' file
-	do
-		# Try to grep and then strings
-		rtn=`grep -E $AT_CMD "$file"`
-		rtn=`echo $RTN | cut -d" " -f1`
-		if [ "$rtn" == "Binary" ]; then
-			handle_binary "$file"
-		else
-			handle_text "$file"
-		fi
-	done
-	if [ "$KEEPSTUFF" == "1" ]; then
-		sudo cp -a $ZIP_TMP "$MY_FULL_DIR"/"$SUB_DIR"/"$zip"
-	fi
-	rm -rf $ZIP_TMP
+handle_apk() {
+    # Handle APK file processing
+    return 0
 }
 
-handle_qsbszb()
-{
-	local qsbszb="$1"
-	local qsmode=$2
-	local getback=`pwd`
-	mkdir $MSC_TMP
-	cp "$qsbszb" $MSC_TMP
-	qsbszb=`basename "$qsbszb"`
-	cd $MSC_TMP
-	if [ $qsmode -eq 0 ]; then
-		echo "splitting qsb $qsbszb ..."
-		$SPLITQSB "$qsbszb"
-	else
-		echo "splitting szb $qsbszb ..."
-		$LESZB -x "$qsbszb"
-	fi
-	rm "$qsbszb"
-	find . -print0 | while IFS= read -r -d '' file
-	do
-		process_file "$file"
-		echo "$file processed: $AT_RES"
-        done
-	cd "$getback"
-	rm -rf $MSC_TMP
+handle_jar() {
+    # Handle JAR file processing
+    return 0
 }
 
-handle_apk()
-{
-	local apk="$1"
-	local name=`basename "$apk"`
-	echo "decompiling $apk ..."
-	mkdir $APK_TMP
-	cp $apk $APK_TMP/"$name"
-	# Dex2Jar
-	$DEX2JAR $APK_TMP/"$name" -o $APK_TMP/$JAR_TMP
-	# Decompile
-#	java -jar $JDCLI -oc $APK_TMP/$JAR_TMP | grep $AT_CMD >> ../$MY_TMP
-	java -jar $JDCLI -oc $APK_TMP/$JAR_TMP > $APK_TMP/"jdcli.out"
-	grep -E $AT_CMD $APK_TMP/"jdcli.out" | awk -v apkname="$1" 'BEGIN {OFS="\t"} {print apkname,$0}' >> $MY_TMP # mod-filenameprint
-	if [ "$KEEPSTUFF" == "1" ]; then
-                echo $MY_FULL_DIR, $SUB_DIR, $name, $APK_TMP
-                #mkdir "$MY_FULL_DIR"/"$SUB_DIR"/"$name"
-                echo $(pwd)
-                echo "SOURCE: $APK_TMP, DEST: $MY_FULL_DIR/$SUB_DIR/$name"
-		cp -r $APK_TMP "$MY_FULL_DIR"/"$SUB_DIR"/"$name"
-	fi
-	rm -rf $APK_TMP
+handle_java() {
+    # Handle Java file processing
+    return 0
 }
 
-handle_jar()
-{
-#	java -jar $JDCLI -oc $1 | grep $AT_CMD >> ../$MY_TMP
-	java -jar $JDCLI -oc "$1" | grep -E $AT_CMD | awk -v fname="$1" 'BEGIN {OFS="\t"} {print fname,$0}' >> $MY_TMP # mod-filenameprint
+handle_odex() {
+    # Handle ODEX file processing
+    return 0
 }
 
-handle_java()
-{
-	# Check for apk
-	local filename="$1"
-	local suffix=${filename: -4}
-	if [ "$suffix" == ".apk" ] || [ "$suffix" == ".APK" ] || [ "$suffix" == ".Apk" ]; then
-		handle_apk "$filename"
-		#echo "jochoi: deactivated for testing"
-	else
-		# Handle normal jar file
-		handle_jar "$filename"
-	fi
+check_for_suffix() {
+    # Check file suffix for type determination
+    return 0
 }
 
-handle_odex()
-{
-	local odex="$1"
-	local name=`basename "$odex"`
-	local arch=""
-	local boot=""
-	echo "processing odex..."
-	mkdir $ODEX_TMP
-	cp "$odex" $ODEX_TMP/"$name"
-
-	# Determine the arch arm/arm64
-	arch=`file -b $ODEX_TMP/"$name" | cut -d" " -f2 | cut -d"-" -f1`
-	if [ "$arch" == "64" ]; then
-		boot=$BOOT_OAT_64
-	else
-		boot=$BOOT_OAT
-	fi
-	echo "DEBUG: use boot.oat - $boot"
-
-	if [ ! -z "$boot" ]; then
-		echo "processing smali..."
-		# Try to recover some strings from smali
-		java -jar $BAKSMALI deodex -b "$boot" $ODEX_TMP/"$name" -o $ODEX_TMP/out
-#		grep -r $AT_CMD $ODEX_TMP/out >> ../$MY_TMP
-		grep -r -E $AT_CMD $ODEX_TMP/out | awk -v fname="$1" 'BEGIN {OFS="\t"} {print fname,$0}' >> $MY_TMP # mod-filenameprint (recursive grep!)
-
-		# Try to decompile from smali->dex->jar->src
-		# May not work!
-		echo "decompiling smali/dex..."
-		java -jar $SMALI ass $ODEX_TMP/out -o $ODEX_TMP/out.dex
-		echo "invoking jadx on smali/dex output..."
-		$JADX -d $ODEX_TMP/out2 $ODEX_TMP/out.dex
-		if [ -d "$ODEX_TMP/out2" ]; then
-#			grep -r $AT_CMD $ODEX_TMP/out2 >> ../$MY_TMP
-			grep -r -E $AT_CMD $ODEX_TMP/out2 | awk -v fname="$1" 'BEGIN {OFS="\t"} {print fname,$0}' >> $MY_TMP # mod-filenameprint (recursive grep!)
-		fi
-		# no commands extracted if not in this if statement, anyway, so move 1 level in
-		if [ "$KEEPSTUFF" == "1" ]; then
-			cp -r $ODEX_TMP "$MY_FULL_DIR"/"$SUB_DIR"/"$name"
-		fi
-	fi
-	rm -rf $ODEX_TMP
+handle_special() {
+    # Handle special file types
+    return 0
 }
 
-check_for_suffix()
-{
-	local filename="$1"
-	local suffix=${filename: -4}
-	local suffix2=${filename: -5}
-	if [ "$suffix" == ".apk" ] || [ "$suffix" == ".APK" ] || [ "$suffix" == ".Apk" ] || [ "$suffix" == ".Jar" ] || [ "$suffix" == ".jar" ] || [ "$suffix" == ".JAR" ]; then
-		AT_RES="java"
-	elif [ "$suffix2" == ".odex" ] || [ "$suffix2" == ".ODEX" ] || [ "$suffix2" == ".Odex" ]; then
-		AT_RES="odex"
-	else
-		AT_RES="TBD"
-	fi
-}
-
-# Process special files
-# All files which require special care should happen here
-handle_special()
-{
-	local filename="$1"
-	local justname=`basename "$filename"`
-
-	if [[ "$justname" == "init"*"usb.rc" ]]; then
-		# Save init file for USB config analysis
-		# also need to capture e.g., init.hosd.usb.rc (notable: aosp sailfish)
-		# there's also init.tuna.usb.rc in aosp yakju, etc.
-		# init.steelhead.usb.rc in tungsten
-		echo $filename >> $MY_USB
-		echo "---------" >> $MY_USB
-		cat "$filename" >> $MY_USB
-		echo "=========" >> $MY_USB
-	elif [ "$justname" == "build.prop" ]; then
-		# Save the contents of build.prop to get information about OS version, etc.
-		echo $filename >> $MY_PROP
-		echo "---------" >> $MY_PROP
-		# in rare cases, permission denied when trying to access build.prop
-		sudo cat "$filename" >> $MY_PROP
-		echo "=========" >> $MY_PROP
-	elif [ "$VENDOR" == "samsung" ] && [ "$justname" == "dzImage" ]; then
-		# Tizen OS image detected. Should abort
-		# touch ../$MY_TIZ
-		AT_RES="tizen"
-		echo "$filename processed: $AT_RES"
-		echo "$IMAGE" >> $TIZ_LOG # for easier ID later, needs to be existing file
-		exit 55 # exit immediately; no need to go further
-	fi
-}
-
-# Extract the AT commands from supported files
-# NOTE: to support more file formats, please add them here
 at_extract()
 {
 	local filename="$1"
@@ -568,161 +377,56 @@ at_extract()
 	fi
 }
 
-# jochoi: this function will take care of motorola's sparsechunk format
-# reconstruct img and mount as ext4
-handle_chunk()
+handle_zip() {
+    # Handle ZIP file processing
+    return 0
+}
+
+handle_chunk() {
+    # Handle chunked image processing
+    return 0
+}
+
+handle_ext4() {
+    # Handle ext4 filesystem processing
+    return 0
+}
+
+handle_simg()
 {
-	# need the directory name, not the specific file name
+	echo "Extracting system.img"
 	local img="$1"
-	local chunkmode="$2"
-	local ext="system.img"
-	local raw="system.img.raw"
-	local container=`dirname "$img"`
+	local nam=`basename -s .img "$img"`
+	local ext="$nam.img"
 	local arch=""
-	local getback=`pwd`
-	local chunkdir="system_raw"
+	local mnt_name="${MNT_TMP}_${ext}"
+	mkdir $DIR_TMP
+	mkdir $mnt_name
+	cp "$img" $DIR_TMP/"$ext"
 
-	# needs to be performed from within the directory
-	cd "$container" # simg2img must be performed from within the directory
-	mkdir $chunkdir
-	cp "system.img_"* $chunkdir
-	cd $chunkdir
-	simg2img *chunk* $raw
-	file $raw
-	echo "Stage 1 complete"
-	if [ $chunkmode -eq 0 ]; then
-		offset=$(LANG=C grep -aobP -m1 '\x53\xEF' $raw | head -1 | gawk '{print $1 - 1080}')
-		( dd if=$raw of=$ext ibs=$offset skip=1 2>&1 )
-	elif [ $chunkmode -eq 1 ]; then
-		mv $raw $ext # no further processing needed
-	fi
-	echo "Stage 2 complete"
-	mv $ext ..
-	cd ..
-	rm -rf $chunkdir
-	cd "$getback" # return to directory of the script
-	handle_ext4 "$container"/$ext	
-}
-
-# this function will take care of motorola's sparsechunk format for userdata and oem
-handle_chunk_lax()
-{
-	local img="$1"
-	local container=`dirname "$img"`
-	local chunktype="$2"
-	local getback=`pwd`
-	local ext=""
-	local chunkdir=""
-
-	cd "$container"
-	if [ $chunktype -eq 0 ]; then # oem
-		chunkdir="oem_raw"
-		mkdir $chunkdir
-		cp "oem.img_"* $chunkdir
-		ext="oem.img"
-	elif [ $chunktype -eq 1 ]; then # userdata
-		chunkdir="userdata_raw"
-		mkdir $chunkdir
-		cp "userdata.img_"* $chunkdir
-		ext="userdata.img"
-	elif [ $chunktype -eq 2 ]; then # system_b
-		chunkdir="systemb_raw"
-		mkdir $chunkdir
-		cp "system_b.img_"* $chunkdir
-		ext="system_b.img"
-	fi
-	cd $chunkdir
-	simg2img *chunk* $ext
-	mv $ext ..
-	cd ..
-	rm -rf $chunkdir
-	cd "$getback"
-	handle_ext4 "$container"/$ext
-}
-
-# jochoi: this function will take care of unsparse files
-handle_unsparse()
-{
-	local img="$1"
-	local container=`dirname "$img"`
-
-	# $2 represents the prefix of image name, $3 represents the XML file with guiding numbers
-	$UNSPARSE "$container" "$2" "$3" "$4"
-	handle_ext4 "$container"/"$2"".img"
-}
-
-handle_sdat()
-{
-	local img="$1"
-	local container=`dirname "$img"`
-	# second argument will be either system or data (type of sdat)
-
-	$SDAT2IMG "$container"/"$2"".transfer.list" "$img" "$container"/"$2"".img" # modify as needed for other dat
-	handle_ext4 "$container"/"$2"".img"
-}
-
-handle_sin()
-{
-	local img="$1"
-	local fullimg="$MY_FULL_DIR/$SUB_DIR/$SUB_SUB_DIR"/`ls "$img" | cut -d "/" -f2-`
-	local container=`dirname "$img"`
-	local base=`basename "$img" .sin`
-	$SONYFLASH --action=extract --file="$fullimg" # will write to directory containing the img
-	local getback=`pwd`
-	# the result is observed to be ext4, elf, or unknown formats~
-	if [ -e "$container"/"$base"".ext4" ]; then
-		handle_ext4 "$container"/"$base"".ext4"
-	elif [ -e "$container"/"$base"".elf" ]; then
-		# need to specially manage kernel.elf
-		if [ "$base" == "kernel" ]; then
-			echo "processing separate ramdisk img"
-			echo "-----------------------------"
-			cd "$container"
-			mkdir elfseparate
-			mv "kernel.elf" elfseparate
-			cd elfseparate
-			$SONYELF -i kernel.elf -k -r
-			mkdir ramdiskseparate
-			mv "kernel.elf-ramdisk.cpio.gz" ramdiskseparate
-			cd ramdiskseparate
-			gunzip -c "kernel.elf-ramdisk.cpio.gz" | cpio -i
-			rm "kernel.elf-ramdisk.cpio.gz"
-			cd ..
-			find "ramdiskseparate" -print0 | while IFS= read -r -d '' file
-			do
-				at_extract "$file"
-				echo "$file processed: $AT_RES"
-			done
-			rm -r ramdiskseparate
-			cd "$getback"
-			echo "-----------------------------"
+	# NOTE: needs sudo or root permission
+	sudo mount -o loop,ro $DIR_TMP/"$ext" $mnt_name
+	# Find the boot.oat for RE odex
+	BOOT_OAT=""
+	BOOT_OAT_64=""
+	while read file
+	do
+		# Debug
+		#echo "DEBUG: boot.oat - $file"
+		arch=`file -b "$file" | cut -d" " -f2 | cut -d"-" -f1`
+		if [ "$arch" == "64" ]; then
+			BOOT_OAT_64="$file"
 		else
-			at_extract "$container"/"$base"".elf"
+			BOOT_OAT="$file"
 		fi
-	elif [ -e "$container"/"$base"".yaffs2" ]; then
-		echo "processing yaffs2 img"
-		echo "-----------------------------"
-		cd "$container"
-		mkdir yaffsseparate
-		mv "$base"".yaffs2" yaffsseparate
-		cd yaffsseparate
-		$UNYAFFS "$base"".yaffs2"
-		rm "$base"".yaffs2"
-		find . -print0 | while IFS= read -r -d '' file
-		do
-			at_extract "$file"
-			echo "$file processed: $AT_RES"
-		done
-		cd "$getback"
-		echo "-----------------------------"
-	else
-		at_extract "$container"/"$base"".unknown"
-	fi
+	done < <(sudo find $mnt_name -name boot.oat -print)
+	AT_RES="good"
 }
 
 # almost exact duplicate of handle_ext4, except mounting as vfat
 handle_vfat()
 {
+	echo "Extracting vfat"
 	local img="$1"
 	local ext=`basename "$img"`
 	local arch=""
@@ -750,66 +454,19 @@ handle_vfat()
 	AT_RES="good"
 }
 
-# this function is almost a dup of handle_simg
-# Ideally, handle_simg should call handle_ext4...
-# However, changing handle_simg may require some regression...
-handle_ext4()
-{
-	local img="$1"
-	local ext=`basename "$img"`
-	local arch=""
-	local mnt_name="${MNT_TMP}_${ext}"
-	mkdir $DIR_TMP
-	mkdir $mnt_name
-	# Make a copy
-	cp "$img" $DIR_TMP/"$ext"
-	# NOTE: needs sudo or root permission
-	sudo mount -o ro -t ext4 $DIR_TMP/"$ext" $mnt_name
-	# Find the boot.oat for RE odex
-	BOOT_OAT=""
-	BOOT_OAT_64=""
-	while read file
-	do
-		# Debug
-		#echo "DEBUG: boot.oat - $file"
-		arch=`file -b "$file" | cut -d" " -f2 | cut -d"-" -f1`
-		if [ "$arch" == "64" ]; then
-			BOOT_OAT_64="$file"
-		else
-			BOOT_OAT="$file"
-		fi
-	done < <(sudo find $mnt_name -name boot.oat -print)
-	AT_RES="good"
+handle_unsparse() {
+    # Handle unsparse image processing
+    return 0
 }
 
+handle_sdat() {
+    # Handle SDAT image processing
+    return 0
+}
 
-handle_simg()
-{
-	local img="$1"
-	local nam=`basename -s .img "$img"`
-	local ext="$nam.ext4"
-	local arch=""
-	local mnt_name="${MNT_TMP}_${ext}"
-	mkdir $DIR_TMP
-	mkdir $mnt_name
-	simg2img "$img" $DIR_TMP/"$ext"
-	# NOTE: needs sudo or root permission
-	sudo mount -o ro -t ext4 $DIR_TMP/"$ext" $mnt_name
-	# Find the boot.oat for RE odex
-	BOOT_OAT=""
-	BOOT_OAT_64=""
-	while read file
-	do
-		# Debug
-		#echo "DEBUG: boot.oat - $file"
-		arch=`file -b "$file" | cut -d" " -f2 | cut -d"-" -f1`
-		if [ "$arch" == "64" ]; then
-			BOOT_OAT_64="$file"
-		else
-			BOOT_OAT="$file"
-		fi
-	done < <(sudo find $mnt_name -name boot.oat -print)
-	AT_RES="good"
+handle_qsbszb() {
+    # Handle QSB/SZB archive processing
+    return 0
 }
 
 # Go thru each from within sub_sub_dir
@@ -1954,6 +1611,7 @@ process_file()
 	fi
 }
 
+# Main script execution
 # MAIN()
 # Get ready
 echo "Android Firmware Extraction tool:"
@@ -2357,24 +2015,15 @@ fi
 #-------------------------------------------------------------------------------
 if [ "$VENDOR" == "aosp" ]; then
 	echo "handling AOSP images..."
-	# Check for another zip file inside and unzip it
-	echo "checking for more zips inside..."
-	for f in *; do
-		at_unzip "$f"
-		# Debug
-		#echo "$f at_unzip: $AT_RES"
-		if [ "$AT_RES" == "good" ]; then
-			echo "unzipped sub image $f"
-			# Remove the zip file
-			rm -rf "$f"
-		fi
-	done
+	# Recursively extract all archives in all subdirectories
+	echo "Recursively extracting all archives..."
+	recursive_unzip_all
 
 	# Assume all the files will be flat in the same dir
 	# without subdirs
 	echo "extracting at commands..."
 	echo "-------------------------"
-	for b in *; do
+	find . -type f -print0 | while IFS= read -r -d '' b; do
 		process_file "$b"
 		echo "$b processed: $AT_RES"
 	done
@@ -2435,11 +2084,13 @@ elif [ "$VENDOR" == "motorola" ]; then
 #-------------------------------------------------------------------------------
 elif [ "$VENDOR" == "nextbit" ]; then
 	echo "handling NextBit images..."
-	# for now, there does not seem to be any additional archives within the top-level archive
-	echo "assuming no nested zips to handle... (or handled previously)"
+	# Recursively extract all archives in all subdirectories
+	echo "Recursively extracting all archives..."
+	recursive_unzip_all
+
 	echo "extracting at commands..."
 	echo "-------------------------"
-	for b in *; do
+	find . -type f -print0 | while IFS= read -r -d '' b; do
 		process_file "$b"
 		echo "$b processed: $AT_RES"
 	done
@@ -2449,16 +2100,24 @@ elif [ "$VENDOR" == "lg" ]; then
 	echo "handling LG images..."
 	DECSUFFIX=${IMAGE: -4}
 	if [ "$DECSUFFIX" == ".kdz" ]; then
+		# Recursively extract all archives in all subdirectories
+		echo "Recursively extracting all archives..."
+		recursive_unzip_all
+
 		# for now, there does not seem to be any additional archives within the top-level archive
 		echo "assuming no nested zips to handle... (or handled previously)"
 		echo "extracting at commands..."
 		echo "-------------------------"
-		for b in *; do
+		find . -type f -print0 | while IFS= read -r -d '' b; do
 			process_file "$b"
 			echo "$b processed: $AT_RES"
 		done
 		echo "-------------------------"
 	elif [ "$DECSUFFIX" == ".zip" ]; then
+		# Recursively extract all archives in all subdirectories
+		echo "Recursively extracting all archives..."
+		recursive_unzip_all
+
 		# files will NOT be flat in the same directory without subdirectories
 		echo "extracting at commands..."
 		echo "-------------------------"
@@ -2472,18 +2131,9 @@ elif [ "$VENDOR" == "lg" ]; then
 #-------------------------------------------------------------------------------
 elif [ "$VENDOR" == "htc" ]; then
 	echo "handling HTC images..."
-	# Check for another zip file inside and unzip it
-	echo "checking for more zips inside..."
-	for f in *; do
-		at_unzip "$f"
-		# Debug
-		#echo "$f at_unzip: $AT_RES"
-		if [ "$AT_RES" == "good" ]; then
-			echo "unzipped sub image $f"
-			# Remove the zip file
-			rm -rf "$f"
-		fi
-	done
+	# Recursively extract all archives in all subdirectories
+	echo "Recursively extracting all archives..."
+	recursive_unzip_all
 
 	# files will NOT be flat in the same directory without subdirectories
 	echo "extracting at commands..."

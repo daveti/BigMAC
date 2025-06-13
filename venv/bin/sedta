@@ -1,0 +1,4 @@
+#!/root/BigMACProject/BigMAC/venv/bin/python3
+# EASY-INSTALL-SCRIPT: 'setools==4.2.dev0','sedta'
+__requires__ = 'setools==4.2.dev0'
+__import__('pkg_resources').run_script('setools==4.2.dev0', 'sedta')

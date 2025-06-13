@@ -124,6 +124,7 @@ CAPABILITIES = {
     35: "CAP_WAKE_ALARM",
     36: "CAP_BLOCK_SUSPEND",
     37: "CAP_AUDIT_READ",
+    38: "CAP_PERFMON",
 }
 
 CAPABILITIES_INV = dict([[v,k] for k,v in CAPABILITIES.items()])

@@ -11,3 +11,7 @@ policy/
 *.pyc
 __pycache__
 *.svg
+
+tools/aosp/
+tools/atsh_setup/
+tools/extract/

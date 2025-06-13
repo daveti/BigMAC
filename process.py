@@ -46,6 +46,8 @@ def main():
     parser.add_argument('--dont-expand-objects', action='store_true')
     parser.add_argument('--prolog', action='store_true', help="Compile Prolog helpers and start the query engine")
 
+    parser.add_argument('--draw-attack-graph', action='store_true', help="Draw filtered attack vector graph (attack paths from untrusted to sensitive nodes).")
+
     args = parser.parse_args()
 
     if args.load and args.save:
@@ -135,9 +137,12 @@ def main():
             pl.interact()
 
     if args.draw_graph:
-        GDF = graph["graphs"]["dataflow"]
-        GP = graph["graphs"]["process"]
-        GSUB = graph["graphs"]["subject"]
+        # Get the fully instantiated dataflow graph
+        GDF = inst.fully_instantiate()
+
+        # Get the original process and subject graphs from the instantiated policy object
+        GP = inst.sepolicy["graphs"]["process"]
+        GSUB = inst.sepolicy["graphs"]["subject"]
 
         focus_set = set()
         if args.focus_set:
@@ -147,6 +152,28 @@ def main():
         plot(GDF, "dataflow.svg", prune=True, debug=False, focus_set=focus_set)
         plot(GP, "process.svg", debug=False)
         plot(GSUB, "subject.svg", debug=False)
+
+        # Attack vector graph generation
+        if args.draw_attack_graph:
+            log.info("Drawing attack vector graph")
+            log.info(f"Total nodes in dataflow graph: {len(GDF.nodes())}")
+            # Heuristic: untrusted nodes contain 'untrusted_app' or 'shell', sensitive nodes contain 'system_server', 'keystore', or 'data/system'
+            untrusted = [n for n in GDF.nodes() if "untrusted_app" in str(n) or "shell" in str(n)]
+            sensitive = [n for n in GDF.nodes() if "system_server" in str(n) or "keystore" in str(n) or "data/system" in str(n)]
+            if not untrusted or not sensitive:
+                log.warning("No untrusted or sensitive nodes found for attack vector graph. Skipping attack vector graph generation.")
+            else:
+                log.info("Finding attack paths...")
+                attack_paths = find_attack_paths(GDF, untrusted, sensitive, max_length=8)
+                log.info(f"Number of attack paths found: {len(attack_paths)}")
+                if not attack_paths:
+                    log.warning("No attack paths found from untrusted to sensitive nodes.")
+                else:
+                    attack_subgraph = build_attack_vector_subgraph(GDF, attack_paths)
+                    log.info(f"Attack subgraph nodes: {list(attack_subgraph.nodes())}")
+                    log.info(f"Attack subgraph edges: {list(attack_subgraph.edges())}")
+                    plot(attack_subgraph, "attack_vectors.svg", prune=False, debug=False)
+                    log.info("Attack vector graph saved as attack_vectors.svg")
 
     return 0
 
@@ -196,7 +223,7 @@ def main_process(args, asp, aspc, file_contexts, primary_filesystem, android_ver
 
     determine_hardware(asp, primary_filesystem, init)
 
-    init.read_configs("/init.rc")
+    init.read_configs("/init.environ.rc")
 
     if not args.skip_boot:
         init.boot_system()
@@ -332,6 +359,21 @@ def plot(G, name, prune=False, debug=False, focus_set=set(), edge_limit=None):
     remove_edges = False
 
     nx.set_node_attributes(G, 'filled,solid', 'style')
+    # Set all edges to dotted style, with a dot at the origin and an arrow at the destination
+    if G.is_multigraph():
+        for u, v, k in G.edges(keys=True):
+            G[u][v][k]['style'] = 'solid'
+            G[u][v][k]['penwidth'] = 2
+            G[u][v][k]['arrowtail'] = 'dot'
+            G[u][v][k]['arrowhead'] = 'normal'
+            G[u][v][k]['dir'] = 'both'
+    else:
+        for u, v in G.edges():
+            G[u][v]['style'] = 'solid'
+            G[u][v]['penwidth'] = 2
+            G[u][v]['arrowtail'] = 'dot'
+            G[u][v]['arrowhead'] = 'normal'
+            G[u][v]['dir'] = 'both'
 
     if prune:
         while True:
@@ -413,6 +455,37 @@ def plot(G, name, prune=False, debug=False, focus_set=set(), edge_limit=None):
 
     #ag2 = pygraphviz.AGraph('wow.dot')
     #ag2.draw('test2.svg', prog='neato', format='svg', args='-Goverlap=false -Goutputorder=edgesfirst -n2')
+
+
+# Created by Aaha=n
+def find_attack_paths(G, sources, targets, max_length=10):
+    import networkx as nx
+    attack_paths = []
+    total_pairs = len(sources) * len(targets)
+    pair_count = 0
+    for i, source in enumerate(sources):
+        for j, target in enumerate(targets):
+            pair_count += 1
+            try:
+                path = nx.shortest_path(G, source=source, target=target)
+                if len(path) - 1 <= max_length:
+                    attack_paths.append(path)
+            except nx.NetworkXNoPath:
+                log.info(f"[find_attack_paths]   No path exists from {source} to {target}")
+    log.info(f"[find_attack_paths] Total attack paths found: {len(attack_paths)}")
+    return attack_paths
+
+def build_attack_vector_subgraph(G, attack_paths):
+    """
+    Given a list of paths, build a subgraph containing only those nodes/edges.
+    """
+    nodes = set()
+    edges = set()
+    for path in attack_paths:
+        nodes.update(path)
+        edges.update(zip(path[:-1], path[1:]))
+    subG = G.edge_subgraph(edges).copy()
+    return subG
 
 if __name__ == "__main__":
     sys.exit(main())
