@@ -9,6 +9,7 @@ import shutil
 import json
 
 import networkx as nx
+from dsl import DSLGraph
 from prolog import Prolog
 from config import *
 from security_policy import ASPCodec, AndroidSecurityPolicy
@@ -45,6 +46,7 @@ def main():
 
     parser.add_argument('--dont-expand-objects', action='store_true')
     parser.add_argument('--prolog', action='store_true', help="Compile Prolog helpers and start the query engine")
+    parser.add_argument('--file-name', type=str, help='Path to the input .bm file')
 
     parser.add_argument('--draw-attack-graph', action='store_true', help="Draw filtered attack vector graph (attack paths from untrusted to sensitive nodes).")
 
@@ -135,6 +137,19 @@ def main():
 
         if pl.compile_all():
             pl.interact()
+    
+    if args.file_name:
+        input_file = args.file_name
+        if not input_file or not os.path.isfile(input_file):
+            log.info("This file does not exist: %s", input_file)
+        elif not input_file.endswith(".bm"):
+            log.info("Please make sure this is a BigMAC .bm file")
+        else:
+            log.info("Output from inputted file: ")
+            GDF = inst.fully_instantiate()
+            g = DSLGraph(GDF)
+            g.parse_file(input_file)
+            g.run_queries()
 
     if args.draw_graph:
         # Get the fully instantiated dataflow graph
