@@ -146,10 +146,9 @@ def main():
             log.info("Please make sure this is a BigMAC .bm file")
         else:
             log.info("Output from inputted file: ")
-            GDF = inst.fully_instantiate()
-            g = DSLGraph(GDF)
+            G = inst.fully_instantiate()
+            g = DSLGraph(G)
             g.parse_file(input_file)
-            g.run_queries()
 
     if args.draw_graph:
         # Get the fully instantiated dataflow graph

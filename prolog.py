@@ -69,6 +69,7 @@ class Prolog(object):
                 {'name' : 'list_saved', 'handler': self.list_saved},
                 {'name' : 'load', 'handler': self.load},
                 {'name' : 'debug', 'handler': self.debug},
+                {'name': 'list_nodes', 'handler': self.list_nodes},
         ]
 
     def print_strongest(self, args):
@@ -116,6 +117,11 @@ class Prolog(object):
     def save_node_map(self):
         with open(self.inst_map_path, 'wb') as fp:
             pickle.dump(self.node_id_map, fp)
+
+    #temporary
+    def list_nodes(self, args):
+        for name in self.node_id_map:
+            print(name)
 
     def compile_all(self):
         new_facts = self._emit_facts()
@@ -549,7 +555,8 @@ class Prolog(object):
             plend, end_pretty = end, end
         else:
             plend, end_pretty = self.node_lookup(end)
-
+        
+        log.info(str(plstart) + "|" + str(plend))
         if not plstart:
             log.error("Unable to lookup start node %s", start)
             return
