@@ -562,6 +562,7 @@ class ASPExtractor:
 
         # Extract out prop files
         prop_files += policy.find("*.prop")
+        print(prop_files)
         prop_files += policy.find("prop.default")
 
         log.info("Collecting android property metadata from %d prop files",

@@ -2,6 +2,7 @@ astroid==2.1.0
 backcall==0.1.0
 cycler==0.10.0
 decorator==4.3.0
+Flask==2.0.1
 graphviz==0.10.1
 ipython==7.2.0
 ipython-genutils==0.2.0

@@ -18,6 +18,7 @@ from android.initrc import AndroidInit
 from segraph import SELinuxPolicyGraph
 from sedump import SELinuxPolicyDump
 from overlay import SEPolicyInst, ProcessState
+import web
 
 logging.basicConfig(stream=sys.stdout, format="%(levelname)s: %(message)s", level=logging.INFO)
 log = logging.getLogger(__name__)
@@ -49,6 +50,7 @@ def main():
     parser.add_argument('--file-name', type=str, help='Path to the input .bm file')
 
     parser.add_argument('--draw-attack-graph', action='store_true', help="Draw filtered attack vector graph (attack paths from untrusted to sensitive nodes).")
+    parser.add_argument('--web', action='store_true', help="Create web display for attack vector graph")
 
     args = parser.parse_args()
 
@@ -111,10 +113,32 @@ def main():
         return
 
     if args.debug:
-        from IPython import embed
+        from IPython.terminal.embed import InteractiveShellEmbed
+
+        G = inst.fully_instantiate()
+        g = DSLGraph(G)
+
+        class DSLInteractiveShell(InteractiveShellEmbed):
+            def __init__(self, dsl_graph):
+                super().__init__()
+                self.dsl_graph = dsl_graph
+                
+            def run_cell(self, raw_cell, **kwargs):
+                if self._is_dsl_command(raw_cell):
+                    self.dsl_graph.parse_line(raw_cell)
+                    return None  
+                else:
+                    return super().run_cell(raw_cell, **kwargs)
+            
+            def _is_dsl_command(self, line):
+                line = line.strip()
+                keywords = self.dsl_graph.get_keywords()
+                return any(line.startswith(keyword) for keyword in keywords)
+            
         oldlevel = logging.getLogger().getEffectiveLevel()
         logging.getLogger().setLevel(logging.INFO)
-        embed()
+        dsl_shell = DSLInteractiveShell(g)
+        dsl_shell()
         logging.getLogger().setLevel(oldlevel)
 
     if args.list_objects:
@@ -148,7 +172,7 @@ def main():
             log.info("Output from inputted file: ")
             G = inst.fully_instantiate()
             g = DSLGraph(G)
-            g.parse_file(input_file)
+            g.parse_file(input_file)        
 
     if args.draw_graph:
         # Get the fully instantiated dataflow graph
@@ -188,6 +212,18 @@ def main():
                     log.info(f"Attack subgraph edges: {list(attack_subgraph.edges())}")
                     plot(attack_subgraph, "attack_vectors.svg", prune=False, debug=False)
                     log.info("Attack vector graph saved as attack_vectors.svg")
+
+    if args.web:
+        # Get the fully instantiated dataflow graph
+        GDF = inst.fully_instantiate()
+
+        # Get the original process and subject graphs from the instantiated policy object
+        #GP = inst.sepolicy["graphs"]["process"]
+        #GSUB = inst.sepolicy["graphs"]["subject"]
+
+        web.start_server(G=GDF)
+        
+        return 0
 
     return 0
 

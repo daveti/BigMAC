@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Graph Viewer</title>
+    <script src="https://unpkg.com/cytoscape/dist/cytoscape.min.js"></script>
+    <style>
+        #cy {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+        }
+    </style>
+</head>
+<body>
+    <div id="cy"></div>
+    <script>
+        const perPage = 100;
+        let cy = null;
+
+        async function fetchGraphData() {
+            const response = await fetch(`/graph/data?page=1&per_page=${perPage}`);
+            console.log(response.status)
+            const data = await response.json();
+            console.log('Fetched graph data:', data);
+            return data;
+        }
+
+        function cytoDataToElements(cytoData) {
+            const nodes = (cytoData.elements.nodes || []).map(n => ({ data: n.data }));
+            const edges = (cytoData.elements.edges || []).map(e => ({ data: e.data }));
+            const elements = nodes.concat(edges);
+            console.log('Processed elements for Cytoscape:', elements);
+            return elements;
+        }
+
+        function renderGraph(cytoData) {
+            const elements = cytoDataToElements(cytoData);
+            if (cy) {
+                cy.destroy();
+            }
+            cy = cytoscape({
+                container: document.getElementById('cy'),
+                elements: elements,
+                style: [
+                    {
+                        selector: 'node',
+                        style: {
+                            'background-color': '#0074D9',
+                            'label': 'data(id)'
+                        }
+                    },
+                    {
+                        selector: 'edge',
+                        style: {
+                            'width': 2,
+                            'line-color': '#aaa',
+                            'target-arrow-color': '#aaa',
+                            'target-arrow-shape': 'triangle',
+                            'curve-style': 'bezier'
+                        }
+                    }
+                ],
+                layout: {
+                    nodeRepulsion: 100000,
+                    name: 'random',
+                    animate: true
+                }
+            });
+            console.log('Cytoscape instance created:', cy);
+        }
+
+        async function loadGraph() {
+            try {
+                const cytoData = await fetchGraphData();
+                if (!cytoData) {
+                    console.error('No cytoData returned from fetchGraphData');
+                    return;
+                }
+                renderGraph(cytoData);
+            } catch (err) {
+                console.error('Error loading or rendering graph:', err);
+            }
+        }
+
+        // Initial load
+        loadGraph();
+    </script>
+</body>
+</html>
