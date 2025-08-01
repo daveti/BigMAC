@@ -267,8 +267,15 @@ class AndroidSecurityPolicy:
 
     def get_properties(self):
         props = self.properties
-        android_version = props['ro.build.version.release']
-        build_id = props['ro.build.id']
+        
+        def get_first_present(props, keys):
+            for key in keys:
+                if key in props:
+                    return props[key]
+            raise ExtractionError(f"Invalid firmware image '{self.firmware_name}': missing required property, tried {keys}")
+
+        android_version = get_first_present(props, ['ro.bootimage.build.version.release', 'ro.build.version.release'])
+        build_id = get_first_present(props, ['ro.bootimage.build.id', 'ro.build.id'])
         brand = props.get_multi_default(
                 ['ro.product.brand', 'ro.product.system.brand'], default="UNKNOWN")
 
@@ -277,8 +284,7 @@ class AndroidSecurityPolicy:
                 ['ro.product.model', 'ro.product.base_model', 'ro.product.system.brand'], default="UNKNOWN")
 
         product_name = props.get_multi_default(['ro.product.name', 'ro.product.system.name'], default="UNKNOWN")
-        product_device = props.get_multi_default(['ro.product.device', 'ro.product.system.device'],
-                                                 default="UNKNOWN")
+        product_device = props.get_multi_default(['ro.product.device', 'ro.product.system.device'], default="UNKNOWN")
 
         interesting_properties = {
             "brand": brand,
@@ -573,6 +579,7 @@ class ASPExtractor:
         # TODO: ensure ordering of property files!
         # Ref: https://rxwen.blogspot.com/2010/01/android-property-system.html
         for prop in prop_files:
+            print(prop)
             (k, v), = prop.items()
             props.from_file(v["original_path"])
 
@@ -580,8 +587,15 @@ class ASPExtractor:
             self.save_file(v["original_path"], os.path.join("prop", k[1:]))
 
         # If we can't find this, we're in trouble
-        if 'ro.build.version.release' not in props:
-            raise ExtractionError("Invalid firmware image '%s': missing Android version in props files" % self.asp.firmware_name)
+        def get_first_present(props, keys):
+            for key in keys:
+                if key in props:
+                    return props[key]
+            raise ExtractionError(f"Missing required property: tried {keys}")
+
+        # Usage:
+        android_version = get_first_present(props, ['ro.bootimage.build.version.release', 'ro.build.version.release'])
+        build_id = get_first_present(props, ['ro.bootimage.build.id', 'ro.build.id'])
 
         self.asp.properties = props
 

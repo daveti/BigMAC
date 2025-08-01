@@ -11,6 +11,7 @@ policy/
 *.pyc
 __pycache__
 *.svg
+*.bm
 
 tools/aosp/
 tools/atsh_setup/

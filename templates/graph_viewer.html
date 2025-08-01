@@ -1,13 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8" />
     <title>Graph Viewer</title>
     <script src="https://unpkg.com/cytoscape/dist/cytoscape.min.js"></script>
     <style>
         #cy {
             width: 100vw;
-            height: 100vh;
+            height: calc(100vh - 50px); /* leave room for search bar */
             display: block;
         }
         body, html {
@@ -15,82 +15,258 @@
             padding: 0;
             width: 100vw;
             height: 100vh;
+            overflow: hidden;
+        }
+        #search-container {
+            height: 50px;
+            padding: 10px;
+            box-sizing: border-box;
+            background: #f0f0f0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        #search-input {
+            flex-grow: 1;
+            font-size: 16px;
+            padding: 5px 8px;
+        }
+        #search-btn {
+            font-size: 16px;
+            padding: 6px 12px;
+            cursor: pointer;
         }
     </style>
 </head>
 <body>
+    <div id="search-container">
+        <input type="text" id="search-input" placeholder="Enter node ID to search" />
+        <button id="search-btn">Search</button>
+    </div>
     <div id="cy"></div>
     <script>
-        const perPage = 100;
-        let cy = null;
+        let nodeCount = 0;
+        const allNodeIds = [];
 
-        async function fetchGraphData() {
-            const response = await fetch(`/graph/data?page=1&per_page=${perPage}`);
-            console.log(response.status)
-            const data = await response.json();
-            console.log('Fetched graph data:', data);
-            return data;
-        }
-
-        function cytoDataToElements(cytoData) {
-            const nodes = (cytoData.elements.nodes || []).map(n => ({ data: n.data }));
-            const edges = (cytoData.elements.edges || []).map(e => ({ data: e.data }));
-            const elements = nodes.concat(edges);
-            console.log('Processed elements for Cytoscape:', elements);
-            return elements;
-        }
-
-        function renderGraph(cytoData) {
-            const elements = cytoDataToElements(cytoData);
-            if (cy) {
-                cy.destroy();
-            }
-            cy = cytoscape({
-                container: document.getElementById('cy'),
-                elements: elements,
-                style: [
-                    {
-                        selector: 'node',
-                        style: {
-                            'background-color': '#0074D9',
-                            'label': 'data(id)'
-                        }
-                    },
-                    {
-                        selector: 'edge',
-                        style: {
-                            'width': 2,
-                            'line-color': '#aaa',
-                            'target-arrow-color': '#aaa',
-                            'target-arrow-shape': 'triangle',
-                            'curve-style': 'bezier'
-                        }
+        const cy = cytoscape({
+            container: document.getElementById('cy'),
+            elements: [],
+            style: [
+                {
+                    selector: 'node',
+                    style: {
+                        'label': 'data(id)',
+                        'background-color': '#0074D9'
                     }
-                ],
-                layout: {
-                    nodeRepulsion: 100000,
-                    name: 'random',
-                    animate: true
+                },
+                {
+                    selector: 'node.no-label',
+                    style: {
+                        'label': ''
+                    }
+                },
+                {
+                    selector: 'node.highlighted',
+                    style: {
+                        'background-color': '#FF4136',
+                        'border-color': '#FFDC00',
+                        'border-width': 3,
+                        'label': 'data(id)',
+                        'font-weight': 'bold',
+                        'font-size': '16px',
+                        'text-outline-color': '#FF4136',
+                        'text-outline-width': 2
+                    }
+                },
+                {
+                    selector: 'node.file',
+                    style: {
+                        'shape': 'rectangle',
+                        'background-color': '#2ECC40',
+                        'label': 'data(id)'
+                    }
+                },
+                {
+                    selector: 'node.process',
+                    style: {
+                        'shape': 'ellipse',
+                        'background-color': '#FF851B',
+                        'label': 'data(id)'
+                    }
+                },
+                {
+                    selector: 'node.subjects',
+                    style: {
+                        'shape': 'hexagon',
+                        'background-color': '#B10DC9',
+                        'label': 'data(id)'
+                    }
+                },
+                {
+                    selector: 'node.sockets',
+                    style: {
+                        'shape': 'triangle',
+                        'background-color': '#75151E',
+                        'label': 'data(id)'
+                    }
+                },
+                {
+                    selector: 'node.file.hidden',
+                    style: { 'display': 'none' }
+                },
+                {
+                    selector: 'node.process.hidden',
+                    style: { 'display': 'none' }
+                },
+                {
+                    selector: 'node.subjects.hidden',
+                    style: { 'display': 'none' }
+                },
+                {
+                    selector: 'node.sockets.hidden',
+                    style: { 'display': 'none' }
+                },
+                {
+                    selector: 'node.file.no-label',
+                    style: { 'label': '' }
+                },
+                {
+                    selector: 'node.process.no-label',
+                    style: { 'label': '' }
+                },
+                {
+                    selector: 'node.subjects.no-label',
+                    style: { 'label': '' }
+                },
+                {
+                    selector: 'node.sockets.no-label',
+                    style: { 'label': '' }
+                },
+                {
+                    selector: 'edge',
+                    style: {
+                        'width': 2,
+                        'line-color': '#AAAAAA',
+                        'target-arrow-shape': 'triangle',
+                        'target-arrow-color': '#AAAAAA',
+                    }
+                },
+                {
+                    selector: 'edge.hidden',
+                    style: { 'display': 'none' }
+                },
+                {
+                    selector: 'node.hidden',
+                    style: { 'visibility': 'hidden' }
                 }
-            });
-            console.log('Cytoscape instance created:', cy);
+            ],
+            layout: { name: 'preset' },
+            renderer: {name: 'canvas'}
+        })
+
+    cy.on('zoom', function () {
+        const zoomLevel = cy.zoom();
+
+        const minZoom = 0.3;
+        const maxZoom = 1.0;
+        const labelThreshold = 0.4; // Labels hide when zoom is below this
+
+        const clampedZoom = Math.max(minZoom, Math.min(maxZoom, zoomLevel));
+        const visibilityRatio = (clampedZoom - minZoom) / (maxZoom - minZoom);
+
+        const nodes = cy.nodes();
+        const edges = cy.edges();
+
+        const minVisibleNodes = Math.floor(nodes.length * 0.1);
+        const minVisibleEdges = Math.floor(edges.length * 0.1);
+
+        const visibleNodeCount = Math.max(minVisibleNodes, Math.floor(nodes.length * visibilityRatio));
+        const visibleEdgeCount = Math.max(minVisibleEdges, Math.floor(edges.length * visibilityRatio));
+
+        if (zoomLevel < labelThreshold) {
+            nodes.addClass('no-label');
+        } else {
+            nodes.removeClass('no-label');
         }
 
-        async function loadGraph() {
-            try {
-                const cytoData = await fetchGraphData();
-                if (!cytoData) {
-                    console.error('No cytoData returned from fetchGraphData');
-                    return;
-                }
-                renderGraph(cytoData);
-            } catch (err) {
-                console.error('Error loading or rendering graph:', err);
+        nodes.addClass('hidden');
+        edges.addClass('hidden');
+
+        for (let i = 0; i < visibleNodeCount; i++) {
+            if (!nodes[i].hasClass('highlighted')) {
+                nodes[i].removeClass('hidden');
+                nodes[i].connectedEdges().removeClass('hidden');
             }
         }
 
-        // Initial load
-        loadGraph();
+        for (let i = 0; i < visibleEdgeCount; i++) {
+            edges[i].removeClass('hidden');
+        }
+
+        cy.nodes('.highlighted').removeClass('hidden');
+        cy.nodes('.highlighted').connectedEdges().removeClass('hidden');
+    });
+
+        // Search function to highlight node by ID and zoom to it
+        function searchNodeById() {
+            // Clear previous highlights
+            cy.nodes('.highlighted').removeClass('highlighted');
+
+            const searchTerm = document.getElementById('search-input').value.trim();
+            if (!searchTerm) {
+                alert('Please enter a node ID to search.');
+                return;
+            }
+
+            const node = cy.getElementById(searchTerm);
+            if (node && node.length > 0) {
+                node.addClass('highlighted');
+                cy.zoom({
+                    level: 1.5,
+                    position: node.position()
+                });
+                cy.center(node);
+            } else {
+                alert('Node with ID "' + searchTerm + '" not found.');
+            }
+        }
+
+        document.getElementById('search-btn').addEventListener('click', searchNodeById);
+
+        const source = new EventSource('/graph/stream');
+
+        source.onmessage = event => {
+            const data = JSON.parse(event.data);
+
+            if (data.type === 'node') {
+
+                nodeCount++;
+                allNodeIds.push(data.id);
+
+                const spacingFactor = 200;
+                const scale = Math.sqrt(nodeCount) * spacingFactor;
+
+                cy.add({
+                    group: 'nodes',
+                    data: { id: data.id, ...data.data },
+                    position: {
+                        x: Math.random() * scale,
+                        y: Math.random() * scale
+                    },
+                    classes: data.data.id.includes('file') ? 'file' : data.data.id.includes('process') ? 'process' : data.data.id.includes('subject:') ? 'subjects' : ''
+                });
+
+            } else if (data.type === 'edge') {
+                cy.add({
+                    group: 'edges',
+                    data: {
+                        source: data.source,
+                        target: data.target,
+                        ...data.data
+                    }
+                });
+            }
+        };
     </script>
 </body>
 </html>

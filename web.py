@@ -1,70 +1,45 @@
 import gzip
 from pprint import pprint
-from flask import render_template, Flask, jsonify, request
+from flask import render_template, Flask, jsonify, request, Response
 import networkx as nx   
 import io, json
 from overlay import FileNode, IPCNode, ProcessNode
+import time
 
 app = Flask(__name__)
 
-def serialize_data(data): 
-    with io.StringIO() as fh:  # replace io with `open(...)` to write to disk
-        json.dump(data, fh)
-        fh.seek(0)
-        return fh.getvalue()
 
+CHUNK_SIZE = 10
 
 @app.route("/graph")
 def get_graph():
     return render_template("graph_viewer.html")
 
-@app.route("/graph/data")
-def get_graph_data():
+
+@app.route('/graph/stream')
+def stream_graph():
+
     G = app.config['G']
+    print(f"G Nodes: {G.number_of_nodes()} Edges: {G.number_of_edges()}")
+    #G_sub = nx.subgraph_view(G, filter_node=lambda n: G.degree(n) > 0)
+    #print(f"G_sub Nodes: {G_sub.number_of_nodes()} Edges: {G_sub.number_of_edges()}")
+
     cyto_data = nx.cytoscape_data(G)
     cyto_data = convert_special_nodes_to_repr(cyto_data)
 
-    # Pagination params
-    page = int(request.args.get('page', 1))
-    per_page = int(request.args.get('per_page', 100))
+    def generate():
+        
+        for n in cyto_data["elements"]["nodes"]:
+            n["type"] = "node"
+            yield f"data: {json.dumps(n)}\n\n"
+            time.sleep(0.05)
+        # Stream edges
+        for e in cyto_data["elements"]["edges"]:
+            e["type"] = "edge"
+            yield f"data: {json.dumps(e)}\n\n"
+            time.sleep(0.05)
 
-    elements = cyto_data.get('elements', {})
-    nodes = elements.get('nodes', [])
-    edges = elements.get('edges', [])
-
-    total_nodes = len(nodes)
-    start = (page - 1) * per_page
-    end = start + per_page
-    paginated_nodes = nodes[start:end]
-
-    # Get the set of node ids in the current page
-    node_ids = set(n['data']['id'] for n in paginated_nodes if 'data' in n and 'id' in n['data'])
-
-    # Only include edges where both source and target are in the current page
-    paginated_edges = [
-        e for e in edges
-        if 'data' in e and e['data'].get('source') in node_ids and e['data'].get('target') in node_ids
-    ]
-
-    paginated_elements = {
-        'nodes': paginated_nodes,
-        'edges': paginated_edges
-    }
-
-    paginated_data = {
-        'data': cyto_data.get('data'),
-        'directed': cyto_data.get('directed'),
-        'multigraph': cyto_data.get('multigraph'),
-        'elements': paginated_elements,
-        'pagination': {
-            'page': page,
-            'per_page': per_page,
-            'total_nodes': total_nodes,
-            'total_pages': (total_nodes + per_page - 1) // per_page
-        }
-    }
-
-    return jsonify(paginated_data)
+    return Response(generate(), mimetype='text/event-stream')
 
 
 def start_server(G): 

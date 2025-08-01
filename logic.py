@@ -3,6 +3,7 @@ import overlay
 import pprint
 import logging
 import stat
+from collections import deque
 
 log = logging.getLogger(__name__)
 
@@ -21,7 +22,8 @@ class Logic:
             {'name' : 'query', 'handler': lambda args: self.query(args, mac_only=False)},
             {'name' : 'query_mac', 'handler': lambda args: self.query(args, mac_only=True)},
             {'name' : 'print', 'handler': lambda args: self.print_paths(args, trust=False)},
-            {'name' : 'print_trust', 'handler': lambda args: self.print_paths(args, trust=True)}
+            {'name' : 'print_trust', 'handler': lambda args: self.print_paths(args, trust=True)},
+            {'name' : 'bfs', 'handler': lambda args: self.bfs_path_finder(args, trust=True)}
         ]
 
         self.node_types = {
@@ -177,3 +179,65 @@ class Logic:
             print(f"Path {pathid+1}: {' -> '.join(pretty)}")
             paths.append(path_info)
         return {'paths': paths}
+
+    def bfs_path_finder(self, args, trust=False):
+        log.info("==== BFS Path Finder Start ====")
+
+        if len(args) < 2:
+            log.info("Error: Less than 2 arguments provided.")
+            return {'error': 'Path Finder needs at least 2 arguments'}
+
+        root, target = args[:2]
+        log.info(f"Root: {root}, Target: {target}")
+
+        node_objs = nx.get_node_attributes(self.graph, 'obj')
+        log.info(f"Available nodes in graph: {list(node_objs.keys())}")
+
+        if root not in node_objs or target not in node_objs:
+            log.info("Error: Root or target not found in node attributes.")
+            return {'error': f'Root or target node not found: {root}, {node_objs}'}
+
+        def bfs(G, root, target):
+            visited = set()
+            queue = deque()
+
+            queue.append((root, [root]))
+            visited.add(root)
+            log.info(f"Initialized queue with root: {root}")
+            
+            while queue:
+                current, path = queue.popleft()
+
+                if current == target:
+                    formatted_path = " -> ".join(path)
+                    log.info(f"Target {target} found! Final path: {formatted_path}")
+                    return path
+
+                neighbors = list(G.neighbors(current))
+
+                for neighbor in neighbors:
+                    if neighbor not in visited:
+                        visited.add(neighbor)
+                        new_path = path + [neighbor]
+                        queue.append((neighbor, new_path))
+                    else:
+                        log.info(f"{neighbor} already visited.")
+            
+            log.info("Target not found in graph.")
+            return None
+
+        bfs_path = bfs(self.graph, root, target)
+        
+        if bfs_path:
+            formatted_path = " -> ".join(bfs_path)
+            log.info(f"Final path: {formatted_path}")
+        else:
+            log.info("Final path: None")
+
+
+        return bfs_path if bfs_path else {'error': 'No path found between nodes.'}
+
+
+
+
+
