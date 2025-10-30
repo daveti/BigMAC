@@ -3,11 +3,20 @@
 <head>
     <meta charset="UTF-8" />
     <title>Graph Viewer</title>
-    <script src="https://unpkg.com/cytoscape/dist/cytoscape.min.js"></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "sigma": "https://cdnjs.cloudflare.com/ajax/libs/sigma.js/3.0.0/sigma.min.js",
+            "graphology": "https://cdn.jsdelivr.net/npm/graphology@0.26.0/dist/graphology.umd.min.js",
+            "graphologyLibrary": "https://cdn.jsdelivr.net/npm/graphology-library/dist/graphology-library.min.js"
+        }
+    } 
+    </script>
+
     <style>
-        #cy {
+        #graph {
             width: 100vw;
-            height: calc(100vh - 50px); /* leave room for search bar */
+            height: calc(100vh - 50px);
             display: block;
         }
         body, html {
@@ -36,6 +45,12 @@
             padding: 6px 12px;
             cursor: pointer;
         }
+        /* Ensure edges draw above nodes, but mouse layer remains on top for interactions */
+        #graph canvas.sigma-edges { z-index: 30 !important; position: relative; pointer-events: none; }
+        #graph canvas.sigma-nodes { z-index: 20 !important; position: relative; pointer-events: none; }
+        #graph canvas.sigma-labels { z-index: 40 !important; position: relative; pointer-events: none; }
+        #graph canvas.sigma-hovers { z-index: 50 !important; position: relative; pointer-events: none; }
+        #graph canvas.sigma-mouse, #graph .sigma-mouse { z-index: 100 !important; position: relative; pointer-events: auto; }
     </style>
 </head>
 <body>
@@ -43,230 +58,221 @@
         <input type="text" id="search-input" placeholder="Enter node ID to search" />
         <button id="search-btn">Search</button>
     </div>
-    <div id="cy"></div>
-    <script>
-        let nodeCount = 0;
-        const allNodeIds = [];
-
-        const cy = cytoscape({
-            container: document.getElementById('cy'),
-            elements: [],
-            style: [
-                {
-                    selector: 'node',
-                    style: {
-                        'label': 'data(id)',
-                        'background-color': '#0074D9'
-                    }
-                },
-                {
-                    selector: 'node.no-label',
-                    style: {
-                        'label': ''
-                    }
-                },
-                {
-                    selector: 'node.highlighted',
-                    style: {
-                        'background-color': '#FF4136',
-                        'border-color': '#FFDC00',
-                        'border-width': 3,
-                        'label': 'data(id)',
-                        'font-weight': 'bold',
-                        'font-size': '16px',
-                        'text-outline-color': '#FF4136',
-                        'text-outline-width': 2
-                    }
-                },
-                {
-                    selector: 'node.file',
-                    style: {
-                        'shape': 'rectangle',
-                        'background-color': '#2ECC40',
-                        'label': 'data(id)'
-                    }
-                },
-                {
-                    selector: 'node.process',
-                    style: {
-                        'shape': 'ellipse',
-                        'background-color': '#FF851B',
-                        'label': 'data(id)'
-                    }
-                },
-                {
-                    selector: 'node.subjects',
-                    style: {
-                        'shape': 'hexagon',
-                        'background-color': '#B10DC9',
-                        'label': 'data(id)'
-                    }
-                },
-                {
-                    selector: 'node.sockets',
-                    style: {
-                        'shape': 'triangle',
-                        'background-color': '#75151E',
-                        'label': 'data(id)'
-                    }
-                },
-                {
-                    selector: 'node.file.hidden',
-                    style: { 'display': 'none' }
-                },
-                {
-                    selector: 'node.process.hidden',
-                    style: { 'display': 'none' }
-                },
-                {
-                    selector: 'node.subjects.hidden',
-                    style: { 'display': 'none' }
-                },
-                {
-                    selector: 'node.sockets.hidden',
-                    style: { 'display': 'none' }
-                },
-                {
-                    selector: 'node.file.no-label',
-                    style: { 'label': '' }
-                },
-                {
-                    selector: 'node.process.no-label',
-                    style: { 'label': '' }
-                },
-                {
-                    selector: 'node.subjects.no-label',
-                    style: { 'label': '' }
-                },
-                {
-                    selector: 'node.sockets.no-label',
-                    style: { 'label': '' }
-                },
-                {
-                    selector: 'edge',
-                    style: {
-                        'width': 2,
-                        'line-color': '#AAAAAA',
-                        'target-arrow-shape': 'triangle',
-                        'target-arrow-color': '#AAAAAA',
-                    }
-                },
-                {
-                    selector: 'edge.hidden',
-                    style: { 'display': 'none' }
-                },
-                {
-                    selector: 'node.hidden',
-                    style: { 'visibility': 'hidden' }
+    <div id="graph"></div>
+    <script type="module">
+        import * as sigma from 'sigma';
+        import 'graphology'; 
+        import 'graphologyLibrary'; 
+        
+        // Setup graph using graphology
+        const graph = new graphology.Graph();
+        const container = document.getElementById('graph');
+        const renderer = new Sigma(graph, container);
+        // As a safeguard, also bump layer z-indexes after mount
+        requestAnimationFrame(() => {
+            const edgesLayer = container.querySelector('canvas.sigma-edges');
+            const nodesLayer = container.querySelector('canvas.sigma-nodes');
+            const mouseLayer = container.querySelector('canvas.sigma-mouse') || container.querySelector('.sigma-mouse');
+            if (edgesLayer) edgesLayer.style.zIndex = '30';
+            if (nodesLayer) nodesLayer.style.zIndex = '20';
+            if (mouseLayer) mouseLayer.style.zIndex = '100';
+            if (edgesLayer) edgesLayer.style.pointerEvents = 'none';
+            if (nodesLayer) nodesLayer.style.pointerEvents = 'none';
+            const labelsLayer = container.querySelector('canvas.sigma-labels');
+            const hoversLayer = container.querySelector('canvas.sigma-hovers');
+            if (labelsLayer) labelsLayer.style.pointerEvents = 'none';
+            if (hoversLayer) hoversLayer.style.pointerEvents = 'none';
+        });
+        const layout = new graphologyLibrary.FA2Layout(graph, 
+            {
+                settings: {
+                    gravity: 0.05,
+                    scalingRatio: 100,           
+                    strongGravityMode: true,  
+                    linLogMode: false,        
+                    outboundAttractionDistribution: true,
+                    adjustSizes: false,      
+                    slowDown: 0.5,             
+                    barnesHutOptimize: true,
+                    barnesHutTheta: 0.5
                 }
-            ],
-            layout: { name: 'preset' },
-            renderer: {name: 'canvas'}
-        })
-
-    cy.on('zoom', function () {
-        const zoomLevel = cy.zoom();
-
-        const minZoom = 0.3;
-        const maxZoom = 1.0;
-        const labelThreshold = 0.4; // Labels hide when zoom is below this
-
-        const clampedZoom = Math.max(minZoom, Math.min(maxZoom, zoomLevel));
-        const visibilityRatio = (clampedZoom - minZoom) / (maxZoom - minZoom);
-
-        const nodes = cy.nodes();
-        const edges = cy.edges();
-
-        const minVisibleNodes = Math.floor(nodes.length * 0.1);
-        const minVisibleEdges = Math.floor(edges.length * 0.1);
-
-        const visibleNodeCount = Math.max(minVisibleNodes, Math.floor(nodes.length * visibilityRatio));
-        const visibleEdgeCount = Math.max(minVisibleEdges, Math.floor(edges.length * visibilityRatio));
-
-        if (zoomLevel < labelThreshold) {
-            nodes.addClass('no-label');
-        } else {
-            nodes.removeClass('no-label');
-        }
-
-        nodes.addClass('hidden');
-        edges.addClass('hidden');
-
-        for (let i = 0; i < visibleNodeCount; i++) {
-            if (!nodes[i].hasClass('highlighted')) {
-                nodes[i].removeClass('hidden');
-                nodes[i].connectedEdges().removeClass('hidden');
             }
-        }
-
-        for (let i = 0; i < visibleEdgeCount; i++) {
-            edges[i].removeClass('hidden');
-        }
-
-        cy.nodes('.highlighted').removeClass('hidden');
-        cy.nodes('.highlighted').connectedEdges().removeClass('hidden');
-    });
-
-        // Search function to highlight node by ID and zoom to it
-        function searchNodeById() {
-            // Clear previous highlights
-            cy.nodes('.highlighted').removeClass('highlighted');
-
-            const searchTerm = document.getElementById('search-input').value.trim();
-            if (!searchTerm) {
-                alert('Please enter a node ID to search.');
-                return;
-            }
-
-            const node = cy.getElementById(searchTerm);
-            if (node && node.length > 0) {
-                node.addClass('highlighted');
-                cy.zoom({
-                    level: 1.5,
-                    position: node.position()
-                });
-                cy.center(node);
-            } else {
-                alert('Node with ID "' + searchTerm + '" not found.');
-            }
-        }
-
-        document.getElementById('search-btn').addEventListener('click', searchNodeById);
-
+        ); 
+        
+        // Enable force directed graph layout to minimize node overlap 
+        // Receive streamed data from server
+        layout.start();
         const source = new EventSource('/graph/stream');
+
+        let idle_timeout;
+        const IDLE_DELAY = 2000; 
+        let batchNodes = [];
+        let batchEdges = [];
+        let batchTimeout;
+
+        let selectedNode = null;
+        let dynamicEdges = new Set();
+
+        // Map of known types to colors and a palette for new types
+        const typeColorMap = new Map([
+            ["file", "#1f77b4"],
+            ["func", "#ff7f0e"],
+            ["class", "#2ca02c"],
+            ["service", "#d62728"],
+            ["db", "#9467bd"]
+        ]);
+        const typePalette = [
+            "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
+            "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"
+        ];
+        
+        // Get color based on node type
+        function getColorForName(name) {
+            if (typeof name !== "string") return "#999999";
+            const sepIndex = name.indexOf(":");
+            if (sepIndex <= 0) return "#999999"; 
+            const type = name.slice(0, sepIndex).toLowerCase().trim();
+            if (typeColorMap.has(type)) return typeColorMap.get(type);
+            let hash = 0;
+            for (let i = 0; i < type.length; i++) {
+                hash = ((hash << 5) - hash) + type.charCodeAt(i);
+                hash |= 0;
+            }
+            const color = typePalette[Math.abs(hash) % typePalette.length];
+            typeColorMap.set(type, color);
+            return color;
+        }
+
+        // Apply alpha to a hex or rgb(a) color while preserving hue
+        function colorWithAlpha(color, alpha) {
+            if (!color) return `rgba(153,153,153,${alpha})`;
+
+            const rgbaMatch = color.match(/^rgba?\((\s*\d+\s*),(\s*\d+\s*),(\s*\d+\s*)(?:,\s*([0-9.]+)\s*)?\)$/i);
+            if (rgbaMatch) {
+                const r = parseInt(rgbaMatch[1]);
+                const g = parseInt(rgbaMatch[2]);
+                const b = parseInt(rgbaMatch[3]);
+                return `rgba(${r},${g},${b},${alpha})`;
+            }
+            if (color[0] === '#') {
+                let r, g, b;
+                if (color.length === 4) {
+                    r = parseInt(color[1] + color[1], 16);
+                    g = parseInt(color[2] + color[2], 16);
+                    b = parseInt(color[3] + color[3], 16);
+                } else if (color.length === 7) {
+                    r = parseInt(color.slice(1, 3), 16);
+                    g = parseInt(color.slice(3, 5), 16);
+                    b = parseInt(color.slice(5, 7), 16);
+                } else {
+                    return `rgba(153,153,153,${alpha})`;
+                }
+                return `rgba(${r},${g},${b},${alpha})`;
+            }
+            return `rgba(153,153,153,${alpha})`;
+        }
 
         source.onmessage = event => {
             const data = JSON.parse(event.data);
-
+            
+            // Node and edge creation
             if (data.type === 'node') {
-
-                nodeCount++;
-                allNodeIds.push(data.id);
-
-                const spacingFactor = 200;
-                const scale = Math.sqrt(nodeCount) * spacingFactor;
-
-                cy.add({
-                    group: 'nodes',
-                    data: { id: data.id, ...data.data },
-                    position: {
-                        x: Math.random() * scale,
-                        y: Math.random() * scale
-                    },
-                    classes: data.data.id.includes('file') ? 'file' : data.data.id.includes('process') ? 'process' : data.data.id.includes('subject:') ? 'subjects' : ''
-                });
-
+                batchNodes.push(...data.nodes.map(node => ({
+                    key: node.data.name,
+                    attributes: {
+                        x: Math.random()*100,
+                        y: Math.random()*100,
+                        label: node.data.name,
+                        size: 10,
+                            color: getColorForName(node.data.name)
+                    }
+                })));
             } else if (data.type === 'edge') {
-                cy.add({
-                    group: 'edges',
-                    data: {
-                        source: data.source,
-                        target: data.target,
-                        ...data.data
+                batchEdges.push(...data.edges.map(edge => ({
+                    source: edge.data.source,
+                    target: edge.data.target,
+                    attributes: {size: 1, color: "black", type: "line"}
+                })));
+            }
+            
+            // Force directed layout updates periodically
+            if (batchTimeout) clearTimeout(batchTimeout);
+            batchTimeout = setTimeout(() => {
+                batchNodes.forEach(n => {
+                    if (!graph.hasNode(n.key)) {
+                        graph.addNode(n.key, n.attributes);
                     }
                 });
-            }
+                batchEdges.forEach(e => {
+                    if (!graph.hasEdge(e.source, e.target)) {
+                        graph.addEdge(e.source, e.target, e.attributes);
+                    }
+                });
+                batchNodes = [];
+                batchEdges = [];
+            }, 100);
+            
+            // Stop force directed when all nodes are added
+            if (idle_timeout) clearTimeout(idle_timeout);
+            idle_timeout = setTimeout(() => {
+                layout.stop();
+            }, IDLE_DELAY);
         };
+
+        renderer.setSetting("nodeReducer", (node, data) => {
+            if (!selectedNode) return data;
+
+            const newData = { ...data };
+            const isNeighbor =
+                graph.hasEdge(node, selectedNode) || graph.hasEdge(selectedNode, node);
+
+            if (node === selectedNode || isNeighbor) {
+                newData.color = data.color;  
+                newData.label = data.label;  
+            } else {
+                newData.color = colorWithAlpha(data.color, 0.2); 
+                newData.label = "";                 
+            }
+            return newData;
+        });
+
+        function clearDynamicEdges() {
+            dynamicEdges.forEach(edgeKey => {
+                if (graph.hasEdge(edgeKey)) {
+                    graph.dropEdge(edgeKey);
+                }
+            });
+            dynamicEdges.clear();
+        }
+
+        // Dynamically display nodes and connected nodes
+        renderer.on("clickNode", ({ node }) => {
+            clearDynamicEdges();
+
+            selectedNode = node;
+            renderer.refresh();
+
+            fetch(`/graph/edges?node=${node}`)
+                .then((res) => res.json())
+                .then((data) => {
+                    data.edges.forEach((edge) => {
+                        if (!graph.hasEdge(edge.data.source, edge.data.target)) {
+                            const edgeKey = graph.addEdge(edge.data.source, edge.data.target, {
+                                size: 1,
+                                color: "grey"
+                            });
+                            dynamicEdges.add(edgeKey);
+                        }
+                    });
+                    renderer.refresh();
+                });
+        });
+
+        renderer.on("clickStage", () => {
+            clearDynamicEdges();
+            selectedNode = null;
+            renderer.refresh();
+        });
     </script>
 </body>
 </html>
